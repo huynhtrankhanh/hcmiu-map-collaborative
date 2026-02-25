@@ -140,13 +140,19 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
 
     panel.innerHTML = `
       <button id="exit-btn" class="bg-red-500 text-white px-4 py-2 rounded w-full mb-3">Exit</button>
-      <h1 class="text-2xl font-semibold mb-3">HCMIU Collaborative</h1>
+      <h1 class="text-2xl font-semibold mb-3">🤝 HCMIU Collaborative Control Center</h1>
       <p class="mb-3 text-sm">Public read access is always available. Login is required to create content.</p>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        <div class="border rounded p-2 text-center"><div class="text-xs uppercase tracking-wide">Entities</div><div class="font-semibold">${entities.length}</div></div>
+        <div class="border rounded p-2 text-center"><div class="text-xs uppercase tracking-wide">Trials</div><div class="font-semibold">${trials.length}</div></div>
+        <div class="border rounded p-2 text-center"><div class="text-xs uppercase tracking-wide">Notifications</div><div class="font-semibold">${notifications.length}</div></div>
+        <div class="border rounded p-2 text-center"><div class="text-xs uppercase tracking-wide">Mode</div><div class="font-semibold">${token ? "Authenticated" : "Public"}</div></div>
+      </div>
       ${options?.focusedEntityId ? `<section class="border rounded p-3 mb-4 bg-green-50"><div class="font-semibold">Focused from map view</div><div class="text-sm">${options.focusedEntityLabel || options.focusedEntityId}</div><div class="text-xs text-gray-700">Entity ID: ${options.focusedEntityId}</div><button id="focused-research" class="bg-green-700 text-white px-3 py-1 rounded mt-2">Find all entities referencing this map entity</button></section>` : ""}
 
       <div class="grid md:grid-cols-2 gap-4">
         <section class="border rounded p-3">
-          <h2 class="font-semibold mb-2">Authentication</h2>
+          <h2 class="font-semibold mb-2">🔐 Authentication</h2>
           <div class="text-sm mb-2">${me ? `Logged in as <b>${me.username}</b>` : "Not logged in"}</div>
           <input id="username" class="border p-2 w-full mb-2" placeholder="Username" />
           <input id="password" type="password" class="border p-2 w-full mb-2" placeholder="Password" />
@@ -157,7 +163,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         </section>
 
         <section class="border rounded p-3">
-          <h2 class="font-semibold mb-2">Create Entity</h2>
+          <h2 class="font-semibold mb-2">📝 Create Entity</h2>
           <input id="entity-title" class="border p-2 w-full mb-2" placeholder="Title" />
           <textarea id="entity-body" class="border p-2 w-full mb-2" placeholder="Body"></textarea>
           <input id="entity-refs" class="border p-2 w-full mb-2" placeholder="References (entity ids, comma-separated)" />
@@ -166,7 +172,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       </div>
 
       <section class="border rounded p-3 mt-4">
-        <h2 class="font-semibold mb-2">Court of Justice</h2>
+        <h2 class="font-semibold mb-2">⚖️ Court of Justice</h2>
         <input id="trial-title" class="border p-2 w-full mb-2" placeholder="Trial title" />
         <input id="trial-defendant" class="border p-2 w-full mb-2" placeholder="Defendant username" />
         <textarea id="trial-description" class="border p-2 w-full mb-2" placeholder="Trial description"></textarea>
@@ -175,7 +181,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       </section>
 
       <section class="border rounded p-3 mt-4">
-        <h2 class="font-semibold mb-2">Deep Research</h2>
+        <h2 class="font-semibold mb-2">🔎 Deep Research</h2>
         <input id="research-refs" class="border p-2 w-full mb-2" placeholder="Reference search ids (comma-separated)" />
         <button id="research-by-refs" class="bg-slate-700 text-white px-3 py-2 rounded mb-2">Find Referencing Entities</button>
         <input id="research-fulltext" class="border p-2 w-full mb-2" placeholder="Full-text query" />
@@ -187,12 +193,12 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       </section>
 
       <section class="border rounded p-3 mt-4">
-        <h2 class="font-semibold mb-2">Entities (live updates via WebSocket)</h2>
+        <h2 class="font-semibold mb-2">📡 Entities (live updates via WebSocket)</h2>
         ${entityMarkup || "<div class=\"text-sm text-gray-600\">No entities yet.</div>"}
       </section>
 
       <section class="border rounded p-3 mt-4">
-        <h2 class="font-semibold mb-2">In-app Notifications</h2>
+        <h2 class="font-semibold mb-2">🔔 In-app Notifications</h2>
         <ul class="list-disc pl-5 text-sm">${notificationMarkup || "<li>No notifications.</li>"}</ul>
       </section>
     `;

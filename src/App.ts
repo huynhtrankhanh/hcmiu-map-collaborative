@@ -14,6 +14,13 @@ import { solveTravelingSalesman } from "./solveTravelingSalesman";
 import { CollaborativePage } from "./CollaborativePage";
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
+const PageIntro = (icon: string, title: string, subtitle: string) =>
+  h(
+    "div.mb-4.border.border-slate-400/30.rounded-xl.p-4",
+    h("p.text-xs.uppercase.tracking-widest.opacity-80", "HCMIU Map Workspace"),
+    h("h1.text-2xl.font-bold.mt-1", h("span.mr-2", icon), title),
+    h("p.text-sm.opacity-90.mt-1", subtitle)
+  );
 
 const MapViewPage = (
   onExit?: () => void,
@@ -63,6 +70,7 @@ const MapViewPage = (
       h(
         "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
         { style: "max-width:72rem" },
+        PageIntro("🗺️", "Campus Explorer", "Browse the map and jump directly into collaborative discussions."),
         h(
           "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
           {
@@ -77,7 +85,7 @@ const MapViewPage = (
           h("div.md:col-span-2", mapView.element),
           h(
             "div.border.rounded.p-3.bg-gray-50",
-            h("h2.text-lg.font-semibold.mb-2", "Map Collaboration"),
+            h("h2.text-lg.font-semibold.mb-2", "🤝 Map Collaboration"),
             h("p.text-sm.mb-2", selectedTitle),
             mapEntity
               ? h(
@@ -156,6 +164,7 @@ const ShortestPathPage = (onExit?: () => void) => {
           { style: "background:#F3F4F6" },
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full.max-w-md",
+            PageIntro("🧭", "Shortest Path Planner", "Set source and destination, then compute the most efficient route."),
             h(
               "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
@@ -219,6 +228,11 @@ const ShortestPathPage = (onExit?: () => void) => {
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
             { style: "max-width:72rem" },
+            PageIntro(
+              currentStage === "choose source on map" ? "📌" : "🎯",
+              currentStage === "choose source on map" ? "Choose Source on Map" : "Choose Destination on Map",
+              "Click a point on the map to set this endpoint."
+            ),
             mapView.element,
             h("div.mb-3"),
             confirmButton,
@@ -280,6 +294,7 @@ const ShortestPathPage = (onExit?: () => void) => {
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
             { style: "max-width:72rem" },
+            PageIntro("✅", "Shortest Route Result", "Review computed legs floor-by-floor and inspect each segment."),
             h(
               "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
@@ -337,6 +352,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
           { style: "background:#F3F4F6" },
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full.max-w-md",
+            PageIntro("📍", "Traveling Salesman Optimizer", "Add multiple destinations and generate an efficient visit order."),
             h(
               "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
@@ -399,6 +415,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
             { style: "max-width:72rem" },
+            PageIntro("🗺️", "Pin Destination on Map", "Select a location to add it to the optimization set."),
             mapView.element,
             h("div.mb-3"),
             confirmButton,
@@ -491,6 +508,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
             { style: "max-width:72rem" },
+            PageIntro("📈", "Optimized Route Overview", "Inspect the generated visit sequence and each floor segment."),
             h(
               "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
@@ -513,7 +531,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
             "div.flex.flex-col.items-center.justify-center",
             h(
               "div.bg-white.p-8.rounded-lg.shadow-md.w-full.max-w-md",
-              h("h1.text-xl.mb-4", "HCMIU Map Pro Required"),
+              PageIntro("⭐", "HCMIU Map Pro Required", "Advanced optimization for very large route sets."),
               h(
                 "p",
                 "You chose " +
