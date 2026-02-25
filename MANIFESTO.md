@@ -1,4 +1,4 @@
-# Basic Tenets
+ # Basic Tenets
 * The license of this project is 0BSD
 * Every feature has to be documented in /docs. Every feature has to be tested. We need both backend API tests and end-to-end Puppeteer tests.
 * The database to be used is ArangoDB.
@@ -13,4 +13,16 @@
   * All changes to content must be reflected immediately on the user interface. This requires the use of WebSockets.
   * **Entity:**
     * Every room in the HCMIU Map is an entity. Every user is an entity. Even the stairs are entities.
-    * HCMIU Map users are talkative.
+    * HCMIU Map users are talkative. All entities can be commented on. Every comment can reference other entities via tagging. Every comment is an entity too, and thus can be referenced or commented on.
+    * Every entity can be followed. When a user follows an entity, the user receives all notifications for that entity.
+    * Notifications are delivered via an in-app mechanism.
+  * In keeping with the spirit of the original HCMIU Map codebase, the subsequent application should also be mobile friendly.
+* Court of justice:
+  * A user can sue another user and appoint judges to hear the trial.
+  * Both the plaintiff and the defendant have to agree on a set of judges. Otherwise, the trial can't move forward.
+  * The judges can rule in favor of one party or another or rule that there is no winner. The outcome is determined by voting.
+  * Everyone involved in the trial can comment on the trial. Spectators can also comment too.
+  * Prominent tags are displayed next to the username to show the role of each user in the trial (plaintiff, defendant, judges, spectators).
+  * The resolution of a trial does not prevent anyone from continuing the discussion. Discussions can continue long after the resolution of a trial.
+  * The court trial itself is an entity and can be referenced.
+* Deep research capability
