@@ -1,0 +1,41 @@
+services:
+  arangodb:
+    image: arangodb:3.11
+    environment:
+      ARANGO_ROOT_PASSWORD: changeme
+    ports:
+      - "8529:8529"
+    volumes:
+      - arangodb_data:/var/lib/arangodb3
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      PORT: 3000
+      USE_IN_MEMORY_DB: "1"
+      ARANGO_URL: http://arangodb:8529
+      ARANGO_DATABASE: hcmiu_map
+      ARANGO_USER: root
+      ARANGO_PASSWORD: changeme
+      FRONTEND_ORIGIN: http://localhost:5173
+    ports:
+      - "3000:3000"
+    restart: on-failure
+    depends_on:
+      - arangodb
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  arangodb_data:
