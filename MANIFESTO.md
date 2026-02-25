@@ -1,5 +1,7 @@
- # Basic Tenets
+# Basic Tenets
 * The license of this project is 0BSD
+* Full internet access is enabled, allowing you to do all sorts of research and download all sorts of software.
+* The software must be easy to deploy. A Docker Compose file should be able to orchestrate everything, including running the database, the backend server, and the frontend server.
 * Every feature has to be documented in /docs. Every feature has to be tested. We need both backend API tests and end-to-end Puppeteer tests.
 * The database to be used is ArangoDB.
 # Current Task
