@@ -83,6 +83,7 @@ Comments are also entities:
   "references": ["entity_y"]
 }
 ```
+When a comment is created, the backend automatically adds a reference to the comment author's user entity.
 
 ### Follow entity
 `POST /api/entities/:id/follow` (auth required)
@@ -135,7 +136,8 @@ Outcome is calculated by judge votes. Discussion can continue via comments on th
 ### Capability 3: Degree of separation
 `GET /api/research/degree?from=entity_x&to=entity_y`
 
-Returns shortest reference-distance path and entities on that path.
+Returns shortest reference-distance path and entities on that path.  
+Reference relationships are treated as bidirectional (undirected graph).
 
 ## Real-time updates (WebSocket)
 Connect to:

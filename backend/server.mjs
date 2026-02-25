@@ -292,15 +292,20 @@ export async function createServer(options = {}) {
   });
 
   app.post("/api/entities", auth, async (req, res) => {
-    const references = Array.isArray(req.body.references) ? req.body.references.filter(Boolean) : [];
+    const references = new Set(Array.isArray(req.body.references) ? req.body.references.filter(Boolean) : []);
     const tags = Array.isArray(req.body.tags) ? req.body.tags.filter(Boolean) : [];
+    if ((req.body.type ?? "post") === "comment") {
+      const userEntities = await store.listEntities({ type: "user" });
+      const creatorUserEntity = userEntities.find((x) => x.createdBy === req.user.id);
+      if (creatorUserEntity) references.add(creatorUserEntity.id);
+    }
     const entity = {
       id: toEntityId("entity"),
       type: req.body.type ?? "post",
       title: `${req.body.title ?? ""}`.trim(),
       body: `${req.body.body ?? ""}`.trim(),
       parentEntityId: req.body.parentEntityId ? String(req.body.parentEntityId) : null,
-      references,
+      references: [...references],
       tags,
       createdBy: req.user.id,
       createdAt: new Date().toISOString(),
@@ -471,6 +476,16 @@ export async function createServer(options = {}) {
     const byId = new Map(entities.map((e) => [e.id, e]));
     if (!byId.has(from) || !byId.has(to)) return res.status(404).json({ error: "entity not found" });
 
+    const adjacency = new Map();
+    for (const entity of entities) adjacency.set(entity.id, new Set());
+    for (const entity of entities) {
+      for (const ref of entity.references ?? []) {
+        if (!adjacency.has(ref)) continue;
+        adjacency.get(entity.id).add(ref);
+        adjacency.get(ref).add(entity.id);
+      }
+    }
+
     const queue = [[from]];
     const seen = new Set([from]);
     let path = null;
@@ -481,8 +496,7 @@ export async function createServer(options = {}) {
         path = currentPath;
         break;
       }
-      const nextRefs = byId.get(last)?.references ?? [];
-      for (const ref of nextRefs) {
+      for (const ref of adjacency.get(last) ?? []) {
         if (!seen.has(ref) && byId.has(ref)) {
           seen.add(ref);
           queue.push([...currentPath, ref]);

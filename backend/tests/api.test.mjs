@@ -64,6 +64,10 @@ test("comprehensive collaborative flow", async () => {
       body: JSON.stringify({ type: "comment", title: "", body: "I comment", parentEntityId: post.entity.id, references: [post.entity.id] }),
     }, plaintiff.token);
     assert.ok(comment.entity.id);
+    const allEntities = await fetchJson(base, "/api/entities");
+    const plaintiffUserEntity = allEntities.entities.find((x) => x.type === "user" && x.createdBy === plaintiff.user.id);
+    assert.ok(plaintiffUserEntity?.id);
+    assert.ok(comment.entity.references.includes(plaintiffUserEntity.id));
 
     const notifications = await fetchJson(base, "/api/notifications", {}, defendant.token);
     assert.equal(notifications.notifications.length, 1);
@@ -98,6 +102,8 @@ test("comprehensive collaborative flow", async () => {
 
     const degree = await fetchJson(base, `/api/research/degree?from=${comment.entity.id}&to=${post.entity.id}`);
     assert.deepEqual(degree.path, [comment.entity.id, post.entity.id]);
+    const reverseDegree = await fetchJson(base, `/api/research/degree?from=${post.entity.id}&to=${comment.entity.id}`);
+    assert.deepEqual(reverseDegree.path, [post.entity.id, comment.entity.id]);
   } finally {
     await server.close();
   }
