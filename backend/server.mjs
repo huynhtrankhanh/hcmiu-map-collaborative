@@ -9,102 +9,47 @@ const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex"
 const randomSalt = () => crypto.randomBytes(16).toString("base64");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-class InMemoryStore {
-  constructor() {
-    this.users = new Map();
-    this.entities = new Map();
-    this.follows = new Map();
-    this.notifications = new Map();
-    this.trials = new Map();
-  }
-  async init() {}
-  async getUserByUsername(username) {
-    for (const user of this.users.values()) if (user.username === username) return user;
-    return null;
-  }
-  async createUser(user) {
-    this.users.set(user.id, user);
-  }
-  async getUserById(id) {
-    return this.users.get(id) ?? null;
-  }
-  async createEntity(entity) {
-    this.entities.set(entity.id, entity);
-  }
-  async updateEntity(entity) {
-    this.entities.set(entity.id, entity);
-  }
-  async deleteEntity(id) {
-    this.entities.delete(id);
-  }
-  async getEntity(id) {
-    return this.entities.get(id) ?? null;
-  }
-  async listEntities(filter = {}) {
-    return [...this.entities.values()].filter((entity) => {
-      if (filter.type && entity.type !== filter.type) return false;
-      if (filter.parentEntityId && entity.parentEntityId !== filter.parentEntityId) return false;
-      return true;
-    }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-  async followEntity(userId, entityId) {
-    const key = `${entityId}:${userId}`;
-    this.follows.set(key, { userId, entityId, createdAt: new Date().toISOString() });
-  }
-  async unfollowEntity(userId, entityId) {
-    const key = `${entityId}:${userId}`;
-    this.follows.delete(key);
-  }
-  async listFollowers(entityId) {
-    return [...this.follows.values()].filter((f) => f.entityId === entityId);
-  }
-  async createNotification(notification) {
-    if (!this.notifications.has(notification.userId)) this.notifications.set(notification.userId, []);
-    this.notifications.get(notification.userId).push(notification);
-  }
-  async listNotifications(userId) {
-    return (this.notifications.get(userId) ?? []).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-  async markNotificationRead(userId, notificationId) {
-    const items = this.notifications.get(userId) ?? [];
-    const target = items.find((x) => x.id === notificationId);
-    if (target) target.read = true;
-  }
-  async createTrial(trial) {
-    this.trials.set(trial.id, trial);
-  }
-  async updateTrial(trial) {
-    this.trials.set(trial.id, trial);
-  }
-  async getTrial(id) {
-    return this.trials.get(id) ?? null;
-  }
-  async listTrials() {
-    return [...this.trials.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-}
-
-class ArangoStore extends InMemoryStore {
+class ArangoStore {
   constructor(url, databaseName, username, password) {
-    super();
+    this.url = url;
     this.db = new Database({ url });
     this.databaseName = databaseName;
     this.username = username;
     this.password = password;
   }
   async init() {
-    this.db.useBasicAuth(this.username, this.password);
-    const dbs = await this.db.listDatabases();
+    const systemDb = new Database({ url: this.url });
+    systemDb.useBasicAuth(this.username, this.password);
+    const dbs = await systemDb.listDatabases();
     if (!dbs.includes(this.databaseName)) {
-      await this.db.createDatabase(this.databaseName);
+      await systemDb.createDatabase(this.databaseName);
     }
-    this.db.useDatabase(this.databaseName);
+    this.db = systemDb.database(this.databaseName);
 
     const collections = ["users", "entities", "follows", "notifications", "trials"];
     for (const name of collections) {
       const collection = this.db.collection(name);
       if (!(await collection.exists())) await collection.create();
     }
+    const referenceEdges = this.db.collection("entity_references");
+    if (!(await referenceEdges.exists())) await referenceEdges.create({ type: 3 });
+  }
+  async syncEntityReferences(entityId, references = []) {
+    const fromId = `entities/${entityId}`;
+    await this.db.query(`FOR edge IN entity_references FILTER edge._from == @fromId REMOVE edge IN entity_references`, { fromId });
+    if (!references.length) return;
+    const uniqueReferences = [...new Set(references)];
+    await this.db.query(`
+      FOR targetKey IN @targets
+        LET targetDoc = DOCUMENT(CONCAT("entities/", targetKey))
+        FILTER targetDoc != null
+        INSERT {
+          _key: SHA256(CONCAT(@fromId, ":", targetKey)),
+          _from: @fromId,
+          _to: CONCAT("entities/", targetKey),
+          createdAt: @createdAt
+        } INTO entity_references OPTIONS { overwriteMode: "replace" }
+    `, { targets: uniqueReferences, fromId, createdAt: new Date().toISOString() });
   }
   async getUserByUsername(username) {
     const cursor = await this.db.query(`FOR u IN users FILTER u.username == @username LIMIT 1 RETURN u`, { username });
@@ -119,11 +64,15 @@ class ArangoStore extends InMemoryStore {
   }
   async createEntity(entity) {
     await this.db.collection("entities").save({ _key: entity.id, ...entity });
+    await this.syncEntityReferences(entity.id, entity.references);
   }
   async updateEntity(entity) {
     await this.db.collection("entities").replace(entity.id, { _key: entity.id, ...entity });
+    await this.syncEntityReferences(entity.id, entity.references);
   }
   async deleteEntity(id) {
+    const docId = `entities/${id}`;
+    await this.db.query(`FOR edge IN entity_references FILTER edge._from == @docId OR edge._to == @docId REMOVE edge IN entity_references`, { docId });
     await this.db.collection("entities").remove(id);
   }
   async getEntity(id) {
@@ -180,6 +129,41 @@ class ArangoStore extends InMemoryStore {
     const cursor = await this.db.query(`FOR t IN trials SORT t.createdAt DESC RETURN t`);
     return await cursor.all();
   }
+  async listReferencingEntities(ids = []) {
+    if (!ids.length) return [];
+    const cursor = await this.db.query(`
+      FOR edge IN entity_references
+        FILTER PARSE_IDENTIFIER(edge._to).key IN @ids
+        COLLECT from = edge._from
+        LET entity = DOCUMENT(from)
+        FILTER entity != null
+        RETURN entity
+    `, { ids });
+    return await cursor.all();
+  }
+  async searchEntitiesByText(queryText) {
+    const q = `${queryText ?? ""}`.trim().toLowerCase();
+    const cursor = await this.db.query(`
+      FOR e IN entities
+        FILTER @q == "" OR CONTAINS(LOWER(CONCAT_SEPARATOR(" ", e.title, e.body)), @q)
+        SORT e.createdAt DESC
+        RETURN e
+    `, { q });
+    return await cursor.all();
+  }
+  async shortestReferencePath(from, to) {
+    const cursor = await this.db.query(`
+      LET start = DOCUMENT(CONCAT("entities/", @from))
+      LET target = DOCUMENT(CONCAT("entities/", @to))
+      FILTER start != null AND target != null
+      FOR vertex IN ANY SHORTEST_PATH start TO target entity_references
+        RETURN vertex
+    `, { from, to });
+    const vertices = await cursor.all();
+    if (!vertices.length) return null;
+    const path = vertices.map((vertex) => vertex.id);
+    return { path, entities: vertices };
+  }
 }
 
 const toEntityId = (prefix) => `${prefix}_${uuidv4().replace(/-/g, "")}`;
@@ -187,7 +171,6 @@ const toEntityId = (prefix) => `${prefix}_${uuidv4().replace(/-/g, "")}`;
 export async function createServer(options = {}) {
   const {
     port = Number(process.env.PORT ?? 3000),
-    useInMemory = process.env.USE_IN_MEMORY_DB === "1",
     arangoUrl = process.env.ARANGO_URL ?? "http://arangodb:8529",
     arangoDatabase = process.env.ARANGO_DATABASE ?? "hcmiu_map",
     arangoUser = process.env.ARANGO_USER ?? "root",
@@ -195,26 +178,20 @@ export async function createServer(options = {}) {
     allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
   } = options;
 
-  const store = useInMemory
-    ? new InMemoryStore()
-    : new ArangoStore(arangoUrl, arangoDatabase, arangoUser, arangoPassword);
-  if (useInMemory) {
-    await store.init();
-  } else {
-    let initialized = false;
-    let lastError = null;
-    for (let i = 0; i < 180; i++) {
-      try {
-        await store.init();
-        initialized = true;
-        break;
-      } catch (error) {
-        lastError = error;
-        await sleep(1000);
-      }
+  const store = new ArangoStore(arangoUrl, arangoDatabase, arangoUser, arangoPassword);
+  let initialized = false;
+  let lastError = null;
+  for (let i = 0; i < 180; i++) {
+    try {
+      await store.init();
+      initialized = true;
+      break;
+    } catch (error) {
+      lastError = error;
+      await sleep(1000);
     }
-    if (!initialized) throw lastError;
   }
+  if (!initialized) throw lastError;
 
   const app = express();
   app.use(express.json());
@@ -353,7 +330,7 @@ export async function createServer(options = {}) {
     }
 
     const comments = await store.listEntities({ type: "comment", parentEntityId: id });
-    const referencing = (await store.listEntities()).filter((x) => (x.references ?? []).includes(id));
+    const referencing = await store.listReferencingEntities([id]);
     res.json({ entity, comments, referencingCount: referencing.length });
   });
 
@@ -553,55 +530,24 @@ export async function createServer(options = {}) {
 
   app.get("/api/research/references", async (req, res) => {
     const ids = `${req.query.ids ?? ""}`.split(",").map((x) => x.trim()).filter(Boolean);
-    const entities = await store.listEntities();
-    const result = entities.filter((entity) => entity.references?.some((ref) => ids.includes(ref)));
-    res.json({ entities: result });
+    res.json({ entities: await store.listReferencingEntities(ids) });
   });
 
   app.get("/api/research/fulltext", async (req, res) => {
-    const q = `${req.query.q ?? ""}`.trim().toLowerCase();
-    const entities = await store.listEntities();
-    const result = !q ? entities : entities.filter((entity) => `${entity.title} ${entity.body}`.toLowerCase().includes(q));
-    res.json({ entities: result });
+    const q = `${req.query.q ?? ""}`;
+    res.json({ entities: await store.searchEntitiesByText(q) });
   });
 
   app.get("/api/research/degree", async (req, res) => {
     const from = `${req.query.from ?? ""}`;
     const to = `${req.query.to ?? ""}`;
-    const entities = await store.listEntities();
-    const byId = new Map(entities.map((e) => [e.id, e]));
-    if (!byId.has(from) || !byId.has(to)) return res.status(404).json({ error: "entity not found" });
-
-    const adjacency = new Map();
-    for (const entity of entities) adjacency.set(entity.id, new Set());
-    for (const entity of entities) {
-      for (const ref of entity.references ?? []) {
-        if (!adjacency.has(ref)) continue;
-        adjacency.get(entity.id).add(ref);
-        adjacency.get(ref).add(entity.id);
-      }
-    }
-
-    const queue = [[from]];
-    const seen = new Set([from]);
-    let path = null;
-    while (queue.length) {
-      const currentPath = queue.shift();
-      const last = currentPath[currentPath.length - 1];
-      if (last === to) {
-        path = currentPath;
-        break;
-      }
-      for (const ref of adjacency.get(last) ?? []) {
-        if (!seen.has(ref) && byId.has(ref)) {
-          seen.add(ref);
-          queue.push([...currentPath, ref]);
-        }
-      }
-    }
-
-    if (!path) return res.status(404).json({ error: "no path" });
-    res.json({ path, entities: path.map((id) => byId.get(id)) });
+    if (!from || !to) return res.status(400).json({ error: "from and to required" });
+    const source = await store.getEntity(from);
+    const destination = await store.getEntity(to);
+    if (!source || !destination) return res.status(404).json({ error: "entity not found" });
+    const result = await store.shortestReferencePath(from, to);
+    if (!result) return res.status(404).json({ error: "no path" });
+    res.json(result);
   });
 
   const server = http.createServer(app);

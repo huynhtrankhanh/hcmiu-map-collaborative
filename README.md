@@ -23,6 +23,7 @@ demo: **https://hcmiumap.huynhtrankhanh.com/**
 
 ```bash
 npm install
+docker compose up -d arangodb
 npm run dev:backend
 npm run dev
 ```

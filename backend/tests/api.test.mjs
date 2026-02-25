@@ -1,7 +1,34 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { setTimeout as delay } from "node:timers/promises";
 import sodium from "libsodium-wrappers-sumo";
 import { createServer } from "../server.mjs";
+
+const root = "/home/runner/work/hcmiu-map-collaborative/hcmiu-map-collaborative";
+
+const runCommand = (args) => {
+  const result = spawnSync("docker", args, {
+    cwd: root,
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (result.status !== 0) {
+    throw new Error(`docker ${args.join(" ")} failed with status ${result.status}`);
+  }
+};
+
+const waitFor = async (url, timeoutMs = 180_000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url);
+      if (res.status < 500) return;
+    } catch {}
+    await delay(1000);
+  }
+  throw new Error(`Timed out waiting for ${url}`);
+};
 
 const fetchJson = async (base, path, options = {}, token) => {
   const response = await fetch(`${base}${path}`, {
@@ -34,10 +61,21 @@ const pwhash = async (password, saltBase64) => {
 
 test("comprehensive collaborative flow", async () => {
   const port = 3900 + Math.floor(Math.random() * 200);
-  const server = await createServer({ port, useInMemory: true, allowedOrigin: "*" });
+  runCommand(["compose", "up", "-d", "arangodb"]);
+  await waitFor("http://127.0.0.1:8529/_api/version");
+  let server;
   const base = `http://127.0.0.1:${port}`;
 
   try {
+    server = await createServer({
+      port,
+      allowedOrigin: "*",
+      arangoUrl: "http://127.0.0.1:8529",
+      arangoDatabase: `hcmiu_map_test_${Date.now()}`,
+      arangoUser: "root",
+      arangoPassword: "changeme",
+    });
+
     const signup = async (username, password) => {
       const start = await fetchJson(base, "/api/auth/signup/start", { method: "POST", body: JSON.stringify({ username }) });
       const clientHash = await pwhash(password, start.clientSalt);
@@ -121,6 +159,7 @@ test("comprehensive collaborative flow", async () => {
     const afterDelete = await fetchJson(base, `/api/entities?parentEntityId=${post.entity.id}`);
     assert.equal(afterDelete.entities.length, 0);
   } finally {
-    await server.close();
+    await server?.close();
+    runCommand(["compose", "down", "-v"]);
   }
 });
