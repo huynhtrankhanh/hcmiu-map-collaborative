@@ -25,5 +25,15 @@
   * Prominent tags are displayed next to the username to show the role of each user in the trial (plaintiff, defendant, judges, spectators).
   * The resolution of a trial does not prevent anyone from continuing the discussion. Discussions can continue long after the resolution of a trial.
   * The court trial itself is an entity and can be referenced.
-* Deep research capability
-  * Capability 1:
+* Deep research capabilities
+  * Capability 1: Find all entities referencing a list of entities
+    * This is to surface detailed information about a list of entities. Remember that the definition of "entities" is expansive!
+  * Capability 2: Full text search
+    * Search all entities with a text query.
+  * Capability 3: Degree of separation
+    * Find the shortest path **in terms of reference distance** between two entities. Given that entities can reference each other, the shortest path in terms of reference distance can tell how related the two entities are.
+    * Display all entities along the path.
+* All original features of HCMIU Map are to be retained.
+* All new features documented above must be:
+  * Human friendly: Clear UI allowing the user to interact with these features.
+  * Machine friendly: Clear API level documentation in /docs for machines.
