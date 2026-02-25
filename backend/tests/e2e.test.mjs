@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import puppeteer from "puppeteer";
 import sodium from "libsodium-wrappers-sumo";
@@ -6,6 +8,7 @@ import sodium from "libsodium-wrappers-sumo";
 const root = "/home/runner/work/hcmiu-map-collaborative/hcmiu-map-collaborative";
 const backendUrl = "http://localhost:3000";
 const frontendUrl = "http://localhost:5173";
+const screenshotDir = path.join(root, "artifacts", "screenshots");
 
 const runCommand = (args) => {
   const result = spawnSync("docker", args, {
@@ -127,10 +130,13 @@ const run = async () => {
     });
 
     await page.goto(frontendUrl, { waitUntil: "networkidle2" });
+    await mkdir(screenshotDir, { recursive: true });
+    await page.screenshot({ path: path.join(screenshotDir, "landing-page.png"), fullPage: true });
 
     // Map -> Collaborative deep integration
     await clickButtonByText(page, "View Map");
     await page.waitForFunction(() => document.body.textContent?.includes("Map Collaboration"));
+    await page.screenshot({ path: path.join(screenshotDir, "map-view-page.png"), fullPage: true });
     await page.evaluate(() => {
       const room = Array.from(document.querySelectorAll("[data-constructname]")).find((x) =>
         (x.getAttribute("data-constructname") || "").includes("A1.109")
@@ -149,6 +155,7 @@ const run = async () => {
     await page.type("#password", password);
     await page.click("#login");
     await page.waitForFunction(() => document.body.textContent?.includes("Logged in as"), { timeout: 30_000 });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-page.png"), fullPage: true });
 
     await page.type("#entity-title", "E2E Core Entity");
     await page.type("#entity-body", "Created in comprehensive docker-compose e2e test");
