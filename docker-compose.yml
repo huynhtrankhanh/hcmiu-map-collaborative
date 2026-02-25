@@ -14,7 +14,6 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       PORT: 3000
-      USE_IN_MEMORY_DB: "1"
       ARANGO_URL: http://arangodb:8529
       ARANGO_DATABASE: hcmiu_map
       ARANGO_USER: root

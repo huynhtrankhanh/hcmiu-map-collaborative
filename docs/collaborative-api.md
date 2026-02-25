@@ -14,6 +14,8 @@ Services:
 - `backend` on port `3000`
 - `frontend` on port `5173`
 
+Backend is ArangoDB-backed only (no in-memory fallback).
+
 ## Authentication (public content still readable)
 
 Login is required for content creation APIs.
@@ -135,14 +137,18 @@ Outcome is calculated by judge votes. Discussion can continue via comments on th
 ### Capability 1: Referencing entities
 `GET /api/research/references?ids=entity_a,entity_b`
 
+Implemented via ArangoDB edge collection `entity_references`.
+
 ### Capability 2: Full-text search
 `GET /api/research/fulltext?q=keyword`
+
+Implemented with ArangoDB AQL text filtering against entity titles/bodies.
 
 ### Capability 3: Degree of separation
 `GET /api/research/degree?from=entity_x&to=entity_y`
 
 Returns shortest reference-distance path and entities on that path.  
-Reference relationships are treated as bidirectional (undirected graph).
+Reference relationships are treated as bidirectional (undirected graph) using ArangoDB `ANY SHORTEST_PATH` traversal over `entity_references`.
 
 ## Real-time updates (WebSocket)
 Connect to:
