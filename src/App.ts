@@ -11,6 +11,7 @@ import { TravelingSalesman } from "./TravelingSalesman";
 import { getFloor, stripFloor } from "./candidates";
 import { generateRandomString } from "./generateRandomString";
 import { solveTravelingSalesman } from "./solveTravelingSalesman";
+import { CollaborativePage } from "./CollaborativePage";
 
 const MapViewPage = (onExit?: () => void) => {
   const element = h(
@@ -483,7 +484,8 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
 const LandingPage = (
   onClickViewMap?: () => void,
   onClickFindShortestPath?: () => void,
-  onClickSolveTravelingSalesman?: () => void
+  onClickSolveTravelingSalesman?: () => void,
+  onClickCollaborative?: () => void
 ) => {
   const element = h(
     "div.flex.flex-col.items-center.justify-center.min-h-screen",
@@ -528,6 +530,15 @@ const LandingPage = (
           },
         },
         "Source Code"
+      ),
+      h(
+        "button.bg-green-600.text-white.px-4.py-2.rounded.w-full.mt-3",
+        {
+          onclick: () => {
+            if (onClickCollaborative !== undefined) onClickCollaborative();
+          },
+        },
+        "HCMIU Collaborative"
       )
     )
   );
@@ -539,7 +550,8 @@ export const App = () => {
     | "landing"
     | "map view"
     | "shortest path"
-    | "traveling salesman" = "landing";
+    | "traveling salesman"
+    | "collaborative" = "landing";
   const element = h("div");
   const transition = (): null => {
     const exit = () => {
@@ -563,6 +575,10 @@ export const App = () => {
             () => {
               currentPage = "traveling salesman";
               transition();
+            },
+            () => {
+              currentPage = "collaborative";
+              transition();
             }
           ).element
         );
@@ -578,6 +594,10 @@ export const App = () => {
       }
       case "traveling salesman": {
         element.appendChild(TravelingSalesmanPage(exit).element);
+        return null;
+      }
+      case "collaborative": {
+        element.appendChild(CollaborativePage(exit).element);
         return null;
       }
     }
