@@ -565,58 +565,113 @@ const LandingPage = (
   onClickSolveTravelingSalesman?: () => void,
   onClickCollaborative?: () => void
 ) => {
+  const primaryActions = [
+    {
+      icon: "🗺️",
+      title: "View Map",
+      subtitle: "Explore floors, rooms, gates, and key facilities at a glance.",
+      className: "bg-blue-500",
+      onClick: () => {
+        if (onClickViewMap !== undefined) onClickViewMap();
+      },
+    },
+    {
+      icon: "🧭",
+      title: "Find Shortest Path",
+      subtitle: "Compute the quickest route between two places across floors.",
+      className: "bg-blue-500",
+      onClick: () => {
+        if (onClickFindShortestPath !== undefined) onClickFindShortestPath();
+      },
+    },
+    {
+      icon: "📍",
+      title: "Solve Traveling Salesman",
+      subtitle: "Optimize multi-stop routes with smart path ordering.",
+      className: "bg-blue-500",
+      onClick: () => {
+        if (onClickSolveTravelingSalesman !== undefined) onClickSolveTravelingSalesman();
+      },
+    },
+    {
+      icon: "🤝",
+      title: "HCMIU Collaborative",
+      subtitle: "Open community-powered discussions tied directly to map entities.",
+      className: "bg-green-600",
+      onClick: () => {
+        if (onClickCollaborative !== undefined) onClickCollaborative();
+      },
+    },
+  ];
+
   const element = h(
     "div.flex.flex-col.items-center.justify-center.min-h-screen",
-    { style: "background:#F3F4F6" },
     h(
-      "div.bg-white.p-8.rounded-lg.shadow-md.w-full.max-w-md",
-      h("h1.text-xl.mb-4.text-center", "HCMIU Map"),
+      "div.w-full.max-w-6xl.grid.gap-5",
       h(
-        "button.bg-blue-500.text-white.px-4.py-2.rounded.w-full.mb-3",
-        {
-          onclick: () => {
-            if (onClickViewMap !== undefined) onClickViewMap();
-          },
-        },
-        "View Map"
+        "div.bg-white.p-8.w-full",
+        h("p.text-xs.tracking-widest.uppercase.text-center.mb-3", "HCMIU Campus Intelligence"),
+        h(
+          "h1.text-3xl.md:text-4xl.font-bold.text-center.mb-2",
+          h("span.mr-2", "🏛️"),
+          "HCMIU Map Platform"
+        ),
+        h(
+          "p.text-center.text-sm.md:text-base.max-w-3xl.mx-auto",
+          "A refined navigation and collaboration workspace for routes, points of interest, and collective campus knowledge."
+        ),
+        h(
+          "div.grid.grid-cols-2.md:grid-cols-4.gap-3.mt-6",
+          h(
+            "div.border.border-slate-400/30.rounded-xl.p-3.text-center",
+            h("p.text-xs.uppercase.tracking-wide.text-slate-300", "Floors"),
+            h("p.text-xl.font-semibold", "7")
+          ),
+          h(
+            "div.border.border-slate-400/30.rounded-xl.p-3.text-center",
+            h("p.text-xs.uppercase.tracking-wide.text-slate-300", "Pathfinding"),
+            h("p.text-xl.font-semibold", "Realtime")
+          ),
+          h(
+            "div.border.border-slate-400/30.rounded-xl.p-3.text-center",
+            h("p.text-xs.uppercase.tracking-wide.text-slate-300", "Collaboration"),
+            h("p.text-xl.font-semibold", "Integrated")
+          ),
+          h(
+            "div.border.border-slate-400/30.rounded-xl.p-3.text-center",
+            h("p.text-xs.uppercase.tracking-wide.text-slate-300", "Experience"),
+            h("p.text-xl.font-semibold", "Professional")
+          )
+        )
       ),
       h(
-        "button.bg-blue-500.text-white.px-4.py-2.rounded.w-full.mb-3",
-        {
-          onclick: () => {
-            if (onClickFindShortestPath !== undefined)
-              onClickFindShortestPath();
+        "div.bg-white.p-6.w-full",
+        h("h2.text-lg.font-semibold.mb-4", "Launchpad"),
+        h(
+          "div.grid.md:grid-cols-2.gap-3",
+          ...primaryActions.map((action) =>
+            h(
+              `button.${action.className}.text-white.px-5.py-4.w-full.text-left`,
+              { onclick: action.onClick },
+              h("p.text-base.font-semibold", h("span.mr-2", action.icon), action.title),
+              h("p.text-xs.opacity-90.mt-1", action.subtitle)
+            )
+          )
+        ),
+        h(
+          "button.bg-blue-500.text-white.px-5.py-4.w-full.mt-3.text-left",
+          {
+            onclick: () => {
+              window.open("https://github.com/huynhtrankhanh/hcmiu-map", "_blank", "noreferrer");
+            },
           },
-        },
-        "Find Shortest Path"
+          h("p.text-base.font-semibold", h("span.mr-2", "💻"), "Source Code"),
+          h("p.text-xs.opacity-90.mt-1", "Review implementation details, architecture, and contribution history.")
+        )
       ),
       h(
-        "button.bg-blue-500.text-white.px-4.py-2.rounded.w-full.mb-3",
-        {
-          onclick: () => {
-            if (onClickSolveTravelingSalesman !== undefined)
-              onClickSolveTravelingSalesman();
-          },
-        },
-        "Solve Traveling Salesman"
-      ),
-      h(
-        "button.bg-blue-500.text-white.px-4.py-2.rounded.w-full",
-        {
-          onclick: () => {
-            window.open("https://github.com/huynhtrankhanh/hcmiu-map", "_blank", "noreferrer");
-          },
-        },
-        "Source Code"
-      ),
-      h(
-        "button.bg-green-600.text-white.px-4.py-2.rounded.w-full.mt-3",
-        {
-          onclick: () => {
-            if (onClickCollaborative !== undefined) onClickCollaborative();
-          },
-        },
-        "HCMIU Collaborative"
+        "div.bg-white.p-5.w-full",
+        h("p.text-sm", "Tip: Start with ", h("span.font-semibold", "View Map"), " to inspect entities, then continue in ", h("span.font-semibold", "HCMIU Collaborative"), ".")
       )
     )
   );
