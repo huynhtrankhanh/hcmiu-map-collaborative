@@ -10,6 +10,10 @@ export const MapView = (
         onChoose: (constructName: string) => void;
       }
     | {
+        type: "browse";
+        onChoose: (payload: { constructName: string; floor: number }) => void;
+      }
+    | {
         type: "display path";
         legs: { floor: number; path: number[] }[];
         changeLegHook: (legChanger: (x: number) => void) => void;
@@ -27,8 +31,8 @@ export const MapView = (
     if (config?.type === "choose on map") {
       mapElement
         .querySelectorAll("[data-isstairs]")
-        .forEach((node) => ((node as HTMLDivElement).style.opacity = "30%"));
-      mapElement.querySelectorAll("[data-isconstruct]").forEach((construct) => {
+        .forEach((node: Element) => ((node as HTMLDivElement).style.opacity = "30%"));
+      mapElement.querySelectorAll("[data-isconstruct]").forEach((construct: Element) => {
         construct.addEventListener("click", () => {
           config.onChoose(
             "Floor " +
@@ -38,7 +42,7 @@ export const MapView = (
           );
           mapElement
             .querySelectorAll("[data-constructselected]")
-            .forEach((x) => {
+            .forEach((x: Element) => {
               x.removeAttribute("data-constructselected");
               (x as HTMLDivElement).style.fontWeight = "";
               (x as HTMLDivElement).style.textDecoration = "";
@@ -47,6 +51,25 @@ export const MapView = (
           (construct as HTMLDivElement).style.fontWeight = "bold";
           (construct as HTMLDivElement).style.textDecoration = "underline";
         });
+      });
+    }
+    if (config?.type === "browse") {
+      mapElement.querySelectorAll("[data-isconstruct]").forEach((construct: Element) => {
+        construct.addEventListener("click", () => {
+          config.onChoose({
+            constructName: construct.getAttribute("data-constructname")!,
+            floor: currentFloor + 1,
+          });
+        });
+      });
+      mapElement.querySelectorAll("[data-isstairs]").forEach((stairs: Element) => {
+        stairs.addEventListener("click", () => {
+          config.onChoose({
+            constructName: "STAIRS",
+            floor: currentFloor + 1,
+          });
+        });
+        (stairs as HTMLDivElement).style.cursor = "pointer";
       });
     }
   };

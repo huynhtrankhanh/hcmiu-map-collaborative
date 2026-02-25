@@ -14,6 +14,7 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       PORT: 3000
+      USE_IN_MEMORY_DB: "1"
       ARANGO_URL: http://arangodb:8529
       ARANGO_DATABASE: hcmiu_map
       ARANGO_USER: root
@@ -21,6 +22,7 @@ services:
       FRONTEND_ORIGIN: http://localhost:5173
     ports:
       - "3000:3000"
+    restart: on-failure
     depends_on:
       - arangodb
 

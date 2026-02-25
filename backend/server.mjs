@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const randomSalt = () => crypto.randomBytes(16).toString("base64");
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class InMemoryStore {
   constructor() {
@@ -30,6 +31,12 @@ class InMemoryStore {
   async createEntity(entity) {
     this.entities.set(entity.id, entity);
   }
+  async updateEntity(entity) {
+    this.entities.set(entity.id, entity);
+  }
+  async deleteEntity(id) {
+    this.entities.delete(id);
+  }
   async getEntity(id) {
     return this.entities.get(id) ?? null;
   }
@@ -43,6 +50,10 @@ class InMemoryStore {
   async followEntity(userId, entityId) {
     const key = `${entityId}:${userId}`;
     this.follows.set(key, { userId, entityId, createdAt: new Date().toISOString() });
+  }
+  async unfollowEntity(userId, entityId) {
+    const key = `${entityId}:${userId}`;
+    this.follows.delete(key);
   }
   async listFollowers(entityId) {
     return [...this.follows.values()].filter((f) => f.entityId === entityId);
@@ -109,6 +120,12 @@ class ArangoStore extends InMemoryStore {
   async createEntity(entity) {
     await this.db.collection("entities").save({ _key: entity.id, ...entity });
   }
+  async updateEntity(entity) {
+    await this.db.collection("entities").replace(entity.id, { _key: entity.id, ...entity });
+  }
+  async deleteEntity(id) {
+    await this.db.collection("entities").remove(id);
+  }
   async getEntity(id) {
     const cursor = await this.db.query(`FOR e IN entities FILTER e.id == @id LIMIT 1 RETURN e`, { id });
     return (await cursor.next()) ?? null;
@@ -127,6 +144,11 @@ class ArangoStore extends InMemoryStore {
   async followEntity(userId, entityId) {
     const _key = sha256(`${entityId}:${userId}`);
     await this.db.collection("follows").save({ _key, userId, entityId, createdAt: new Date().toISOString() }, { overwriteMode: "ignore" });
+  }
+  async unfollowEntity(userId, entityId) {
+    const _key = sha256(`${entityId}:${userId}`);
+    const collection = this.db.collection("follows");
+    if (await collection.documentExists(_key)) await collection.remove(_key);
   }
   async listFollowers(entityId) {
     const cursor = await this.db.query(`FOR f IN follows FILTER f.entityId == @entityId RETURN f`, { entityId });
@@ -176,7 +198,23 @@ export async function createServer(options = {}) {
   const store = useInMemory
     ? new InMemoryStore()
     : new ArangoStore(arangoUrl, arangoDatabase, arangoUser, arangoPassword);
-  await store.init();
+  if (useInMemory) {
+    await store.init();
+  } else {
+    let initialized = false;
+    let lastError = null;
+    for (let i = 0; i < 180; i++) {
+      try {
+        await store.init();
+        initialized = true;
+        break;
+      } catch (error) {
+        lastError = error;
+        await sleep(1000);
+      }
+    }
+    if (!initialized) throw lastError;
+  }
 
   const app = express();
   app.use(express.json());
@@ -291,6 +329,34 @@ export async function createServer(options = {}) {
     res.json({ entities });
   });
 
+  app.get("/api/map/entity", async (req, res) => {
+    const constructName = `${req.query.constructName ?? ""}`.trim();
+    if (!constructName) return res.status(400).json({ error: "constructName required" });
+
+    const floor = Number(req.query.floor ?? 1);
+    const normalizedName = `Floor ${Number.isFinite(floor) && floor > 0 ? floor : 1}: ${constructName}`;
+    const id = `entity_map_${sha256(normalizedName).slice(0, 24)}`;
+    let entity = await store.getEntity(id);
+    if (!entity) {
+      entity = {
+        id,
+        type: "map_location",
+        title: normalizedName,
+        body: `Collaborative thread for ${normalizedName}`,
+        parentEntityId: null,
+        references: [],
+        tags: ["map", "room-or-stairs"],
+        createdBy: "system",
+        createdAt: new Date().toISOString(),
+      };
+      await store.createEntity(entity);
+    }
+
+    const comments = await store.listEntities({ type: "comment", parentEntityId: id });
+    const referencing = (await store.listEntities()).filter((x) => (x.references ?? []).includes(id));
+    res.json({ entity, comments, referencingCount: referencing.length });
+  });
+
   app.post("/api/entities", auth, async (req, res) => {
     const references = new Set(Array.isArray(req.body.references) ? req.body.references.filter(Boolean) : []);
     const tags = Array.isArray(req.body.tags) ? req.body.tags.filter(Boolean) : [];
@@ -339,6 +405,36 @@ export async function createServer(options = {}) {
     const entity = await store.getEntity(req.params.id);
     if (!entity) return res.status(404).json({ error: "entity not found" });
     await store.followEntity(req.user.id, entity.id);
+    res.status(204).end();
+  });
+
+  app.post("/api/entities/:id/unfollow", auth, async (req, res) => {
+    const entity = await store.getEntity(req.params.id);
+    if (!entity) return res.status(404).json({ error: "entity not found" });
+    await store.unfollowEntity(req.user.id, entity.id);
+    res.status(204).end();
+  });
+
+  app.patch("/api/entities/:id", auth, async (req, res) => {
+    const entity = await store.getEntity(req.params.id);
+    if (!entity) return res.status(404).json({ error: "entity not found" });
+    if (entity.createdBy !== req.user.id) return res.status(403).json({ error: "only creator can edit entity" });
+
+    entity.title = req.body.title !== undefined ? `${req.body.title}`.trim() : entity.title;
+    entity.body = req.body.body !== undefined ? `${req.body.body}`.trim() : entity.body;
+    if (Array.isArray(req.body.references)) entity.references = req.body.references.filter(Boolean);
+    if (Array.isArray(req.body.tags)) entity.tags = req.body.tags.filter(Boolean);
+    await store.updateEntity(entity);
+    sendWs({ type: "entity.updated", entity });
+    res.json({ entity });
+  });
+
+  app.delete("/api/entities/:id", auth, async (req, res) => {
+    const entity = await store.getEntity(req.params.id);
+    if (!entity) return res.status(404).json({ error: "entity not found" });
+    if (entity.createdBy !== req.user.id) return res.status(403).json({ error: "only creator can delete entity" });
+    await store.deleteEntity(entity.id);
+    sendWs({ type: "entity.deleted", id: entity.id });
     res.status(204).end();
   });
 

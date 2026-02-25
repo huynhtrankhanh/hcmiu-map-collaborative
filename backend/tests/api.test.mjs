@@ -57,6 +57,12 @@ test("comprehensive collaborative flow", async () => {
       body: JSON.stringify({ type: "post", title: "A", body: "Entity A", references: [] }),
     }, plaintiff.token);
 
+    const mapEntityResult = await fetchJson(base, "/api/map/entity?constructName=A1.109&floor=1");
+    assert.equal(mapEntityResult.entity.type, "map_location");
+    assert.equal(mapEntityResult.comments.length, 0);
+
+    await fetchJson(base, `/api/entities/${post.entity.id}/follow`, { method: "POST" }, defendant.token);
+    await fetchJson(base, `/api/entities/${post.entity.id}/unfollow`, { method: "POST" }, defendant.token);
     await fetchJson(base, `/api/entities/${post.entity.id}/follow`, { method: "POST" }, defendant.token);
 
     const comment = await fetchJson(base, "/api/entities", {
@@ -68,6 +74,12 @@ test("comprehensive collaborative flow", async () => {
     const plaintiffUserEntity = allEntities.entities.find((x) => x.type === "user" && x.createdBy === plaintiff.user.id);
     assert.ok(plaintiffUserEntity?.id);
     assert.ok(comment.entity.references.includes(plaintiffUserEntity.id));
+
+    const edited = await fetchJson(base, `/api/entities/${post.entity.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ body: "Entity A edited" }),
+    }, plaintiff.token);
+    assert.equal(edited.entity.body, "Entity A edited");
 
     const notifications = await fetchJson(base, "/api/notifications", {}, defendant.token);
     assert.equal(notifications.notifications.length, 1);
@@ -104,6 +116,10 @@ test("comprehensive collaborative flow", async () => {
     assert.deepEqual(degree.path, [comment.entity.id, post.entity.id]);
     const reverseDegree = await fetchJson(base, `/api/research/degree?from=${post.entity.id}&to=${comment.entity.id}`);
     assert.deepEqual(reverseDegree.path, [post.entity.id, comment.entity.id]);
+
+    await fetchJson(base, `/api/entities/${comment.entity.id}`, { method: "DELETE" }, plaintiff.token);
+    const afterDelete = await fetchJson(base, `/api/entities?parentEntityId=${post.entity.id}`);
+    assert.equal(afterDelete.entities.length, 0);
   } finally {
     await server.close();
   }

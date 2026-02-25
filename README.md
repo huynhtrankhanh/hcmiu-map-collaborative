@@ -42,3 +42,5 @@ docker compose up --build
 npm run test:api
 npm run test:e2e
 ```
+
+`npm run test:e2e` runs against the full Docker Compose deployment to validate production-like behavior.

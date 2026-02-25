@@ -13,26 +13,104 @@ import { generateRandomString } from "./generateRandomString";
 import { solveTravelingSalesman } from "./solveTravelingSalesman";
 import { CollaborativePage } from "./CollaborativePage";
 
-const MapViewPage = (onExit?: () => void) => {
-  const element = h(
-    "div.flex.flex-col.items-center.justify-center.min-h-screen",
-    { style: "background:#F3F4F6" },
-    h(
-      "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
-      { style: "max-width:72rem" },
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
+
+const MapViewPage = (
+  onExit?: () => void,
+  onOpenCollaborative?: (payload: { entityId: string; label: string }) => void
+) => {
+  const root = h("div");
+  let selectedConstruct: { floor: number; constructName: string } | null = null;
+  let mapEntity: any = null;
+  let comments: any[] = [];
+  let referencingCount = 0;
+
+  const loadMapThread = async () => {
+    if (!selectedConstruct) return;
+    const url = `${API_BASE}/api/map/entity?constructName=${encodeURIComponent(
+      selectedConstruct.constructName
+    )}&floor=${selectedConstruct.floor}`;
+    const response = await fetch(url);
+    const body = await response.json();
+    mapEntity = body.entity;
+    comments = body.comments;
+    referencingCount = body.referencingCount;
+  };
+
+  const render = () => {
+    root.innerHTML = "";
+    const commentNodes =
+      comments.length > 0
+        ? comments.map((comment) => h("li.mb-1", comment.body))
+        : [h("li", "No comments yet.")];
+
+    const mapView = MapView({
+      type: "browse",
+      onChoose: async (payload) => {
+        selectedConstruct = payload;
+        await loadMapThread();
+        render();
+      },
+    });
+
+    const selectedTitle = selectedConstruct
+      ? `Floor ${selectedConstruct.floor}: ${selectedConstruct.constructName}`
+      : "Select a room/stairs on the map";
+
+    const element = h(
+      "div.flex.flex-col.items-center.justify-center.min-h-screen",
+      { style: "background:#F3F4F6" },
       h(
-        "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
-        {
-          onclick: () => {
-            if (onExit !== undefined) onExit();
+        "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
+        { style: "max-width:72rem" },
+        h(
+          "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
+          {
+            onclick: () => {
+              if (onExit !== undefined) onExit();
+            },
           },
-        },
-        "Exit"
-      ),
-      MapView().element
-    )
-  );
-  return { element };
+          "Exit"
+        ),
+        h(
+          "div.grid.md:grid-cols-3.gap-4",
+          h("div.md:col-span-2", mapView.element),
+          h(
+            "div.border.rounded.p-3.bg-gray-50",
+            h("h2.text-lg.font-semibold.mb-2", "Map Collaboration"),
+            h("p.text-sm.mb-2", selectedTitle),
+            mapEntity
+              ? h(
+                  "div",
+                  h("p.text-xs.mb-2", `Entity ID: ${mapEntity.id}`),
+                  h("p.text-xs.mb-2", `Entities referencing this location: ${referencingCount}`),
+                  h("h3.font-semibold.mb-2", "Comments"),
+                  h("ul.text-sm.list-disc.pl-5.max-h-56.overflow-auto", commentNodes),
+                  h(
+                    "button.bg-green-600.text-white.px-3.py-2.rounded.w-full.mt-3",
+                    {
+                      onclick: () => {
+                        if (onOpenCollaborative && mapEntity) {
+                          onOpenCollaborative({
+                            entityId: mapEntity.id,
+                            label: selectedTitle,
+                          });
+                        }
+                      },
+                    },
+                    "Open in HCMIU Collaborative"
+                  )
+                )
+              : h("p.text-sm.text-gray-600", "Click a room or stairs to view discussion thread.")
+          )
+        )
+      )
+    );
+    root.appendChild(element);
+  };
+
+  render();
+  return { element: root };
 };
 
 const ShortestPathPage = (onExit?: () => void) => {
@@ -546,6 +624,7 @@ const LandingPage = (
 };
 
 export const App = () => {
+  let collaborativeFocus: { entityId: string; label: string } | null = null;
   let currentPage:
     | "landing"
     | "map view"
@@ -585,7 +664,13 @@ export const App = () => {
         return null;
       }
       case "map view": {
-        element.appendChild(MapViewPage(exit).element);
+        element.appendChild(
+          MapViewPage(exit, (payload) => {
+            collaborativeFocus = payload;
+            currentPage = "collaborative";
+            transition();
+          }).element
+        );
         return null;
       }
       case "shortest path": {
@@ -597,7 +682,12 @@ export const App = () => {
         return null;
       }
       case "collaborative": {
-        element.appendChild(CollaborativePage(exit).element);
+        element.appendChild(
+          CollaborativePage(exit, {
+            focusedEntityId: collaborativeFocus?.entityId,
+            focusedEntityLabel: collaborativeFocus?.label,
+          }).element
+        );
         return null;
       }
     }

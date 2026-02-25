@@ -63,6 +63,11 @@ Optional query params:
 - `type`
 - `parentEntityId`
 
+### Map integration entity lookup
+`GET /api/map/entity?constructName=A1.109&floor=1`
+
+Returns (and lazily provisions if needed) the collaborative entity for a map location (room/stairs), plus comments and referencing count for deep integration with map view.
+
 ### Create entity (auth required)
 `POST /api/entities`
 ```json
@@ -151,4 +156,5 @@ Event types include:
 
 ## Tests
 - API: `npm run test:api`
-- Puppeteer E2E: `npm run test:e2e`
+- Puppeteer E2E (production-like): `npm run test:e2e`  
+  This test spins up the full Docker Compose stack (`arangodb`, `backend`, `frontend`) before running browser automation.

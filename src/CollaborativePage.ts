@@ -37,7 +37,12 @@ const hashClientPassword = async (password: string, saltBase64: string) => {
   return sodium.to_base64(derived, sodium.base64_variants.ORIGINAL);
 };
 
-export const CollaborativePage = (onExit?: () => void) => {
+type CollaborativePageOptions = {
+  focusedEntityId?: string;
+  focusedEntityLabel?: string;
+};
+
+export const CollaborativePage = (onExit?: () => void, options?: CollaborativePageOptions) => {
   const root = h("div");
   let token = "";
   let me: { id: string; username: string } | null = null;
@@ -86,6 +91,7 @@ export const CollaborativePage = (onExit?: () => void) => {
       .map((entity) => {
         const comments = entities.filter((x) => x.parentEntityId === entity.id);
         const trial = trials.find((t) => t.entityId === entity.id);
+        const mine = me?.id === entity.createdBy;
         const commentsMarkup = comments
           .map((comment) => `<li>${createCommentTag(comment, trial)} ${comment.body}</li>`)
           .join("");
@@ -95,7 +101,7 @@ export const CollaborativePage = (onExit?: () => void) => {
             <div class="text-sm">${entity.body || ""}</div>
             <div class="text-xs text-gray-600">id: ${entity.id}</div>
             <div class="text-xs text-gray-600">refs: ${(entity.references || []).join(", ") || "none"}</div>
-            ${token ? `<button data-follow="${entity.id}" class="bg-blue-500 text-white px-2 py-1 rounded mt-2">Follow</button>` : ""}
+            ${token ? `<div class="flex gap-2 flex-wrap mt-2"><button data-follow="${entity.id}" class="bg-blue-500 text-white px-2 py-1 rounded">Follow</button><button data-unfollow="${entity.id}" class="bg-gray-600 text-white px-2 py-1 rounded">Unfollow</button><button data-research-one="${entity.id}" class="bg-slate-700 text-white px-2 py-1 rounded">Find references</button>${mine ? `<button data-edit="${entity.id}" class="bg-yellow-600 text-white px-2 py-1 rounded">Edit</button><button data-delete="${entity.id}" class="bg-red-700 text-white px-2 py-1 rounded">Delete</button>` : ""}</div>` : ""}
             ${token ? `<div class="mt-2"><input data-comment-input="${entity.id}" class="border p-1 w-full" placeholder="Comment" /><button data-comment="${entity.id}" class="bg-green-600 text-white px-2 py-1 rounded mt-1">Comment</button></div>` : ""}
             <ul class="text-sm list-disc pl-5 mt-2">${commentsMarkup}</ul>
           </div>
@@ -136,6 +142,7 @@ export const CollaborativePage = (onExit?: () => void) => {
       <button id="exit-btn" class="bg-red-500 text-white px-4 py-2 rounded w-full mb-3">Exit</button>
       <h1 class="text-2xl font-semibold mb-3">HCMIU Collaborative</h1>
       <p class="mb-3 text-sm">Public read access is always available. Login is required to create content.</p>
+      ${options?.focusedEntityId ? `<section class="border rounded p-3 mb-4 bg-green-50"><div class="font-semibold">Focused from map view</div><div class="text-sm">${options.focusedEntityLabel || options.focusedEntityId}</div><div class="text-xs text-gray-700">Entity ID: ${options.focusedEntityId}</div><button id="focused-research" class="bg-green-700 text-white px-3 py-1 rounded mt-2">Find all entities referencing this map entity</button></section>` : ""}
 
       <div class="grid md:grid-cols-2 gap-4">
         <section class="border rounded p-3">
@@ -276,7 +283,7 @@ export const CollaborativePage = (onExit?: () => void) => {
       }
     });
 
-    panel.querySelectorAll("[data-follow]").forEach((button) => {
+    panel.querySelectorAll("[data-follow]").forEach((button: Element) => {
       button.addEventListener("click", async () => {
         try {
           await jsonFetch(`/api/entities/${(button as HTMLElement).dataset.follow}/follow`, { method: "POST" }, token);
@@ -286,8 +293,57 @@ export const CollaborativePage = (onExit?: () => void) => {
         }
       });
     });
+    panel.querySelectorAll("[data-unfollow]").forEach((button: Element) => {
+      button.addEventListener("click", async () => {
+        try {
+          await jsonFetch(`/api/entities/${(button as HTMLElement).dataset.unfollow}/unfollow`, { method: "POST" }, token);
+          alert("Unfollowed!");
+        } catch (error: any) {
+          alert(error.message);
+        }
+      });
+    });
+    panel.querySelectorAll("[data-research-one]").forEach((button: Element) => {
+      button.addEventListener("click", async () => {
+        try {
+          const result = await jsonFetch(`/api/research/references?ids=${encodeURIComponent((button as HTMLElement).dataset.researchOne!)}`);
+          searchOutput = JSON.stringify(result, null, 2);
+          render();
+        } catch (error: any) {
+          alert(error.message);
+        }
+      });
+    });
+    panel.querySelectorAll("[data-edit]").forEach((button: Element) => {
+      button.addEventListener("click", async () => {
+        const entityId = (button as HTMLElement).dataset.edit!;
+        const target = entities.find((x) => x.id === entityId);
+        const nextBody = prompt("Edit entity body", target?.body ?? "");
+        if (nextBody === null) return;
+        try {
+          await jsonFetch(`/api/entities/${entityId}`, { method: "PATCH", body: JSON.stringify({ body: nextBody }) }, token);
+          await refresh();
+          render();
+        } catch (error: any) {
+          alert(error.message);
+        }
+      });
+    });
+    panel.querySelectorAll("[data-delete]").forEach((button: Element) => {
+      button.addEventListener("click", async () => {
+        const entityId = (button as HTMLElement).dataset.delete!;
+        if (!confirm("Delete this entity?")) return;
+        try {
+          await jsonFetch(`/api/entities/${entityId}`, { method: "DELETE" }, token);
+          await refresh();
+          render();
+        } catch (error: any) {
+          alert(error.message);
+        }
+      });
+    });
 
-    panel.querySelectorAll("[data-comment]").forEach((button) => {
+    panel.querySelectorAll("[data-comment]").forEach((button: Element) => {
       button.addEventListener("click", async () => {
         const entityId = (button as HTMLElement).dataset.comment!;
         const input = panel.querySelector(`[data-comment-input='${entityId}']`) as HTMLInputElement;
@@ -305,7 +361,7 @@ export const CollaborativePage = (onExit?: () => void) => {
       });
     });
 
-    panel.querySelectorAll("[data-trial-comment]").forEach((button) => {
+    panel.querySelectorAll("[data-trial-comment]").forEach((button: Element) => {
       button.addEventListener("click", async () => {
         const entityId = (button as HTMLElement).dataset.trialComment!;
         const input = panel.querySelector(`[data-trial-comment-input='${entityId}']`) as HTMLInputElement;
@@ -323,7 +379,7 @@ export const CollaborativePage = (onExit?: () => void) => {
       });
     });
 
-    panel.querySelectorAll("[data-judges]").forEach((button) => {
+    panel.querySelectorAll("[data-judges]").forEach((button: Element) => {
       button.addEventListener("click", async () => {
         const trialId = (button as HTMLElement).dataset.judges!;
         const input = panel.querySelector(`[data-judges-input='${trialId}']`) as HTMLInputElement;
@@ -337,7 +393,7 @@ export const CollaborativePage = (onExit?: () => void) => {
       });
     });
 
-    panel.querySelectorAll("[data-vote]").forEach((button) => {
+    panel.querySelectorAll("[data-vote]").forEach((button: Element) => {
       button.addEventListener("click", async () => {
         const trialId = (button as HTMLElement).dataset.vote!;
         const select = panel.querySelector(`[data-vote-input='${trialId}']`) as HTMLSelectElement;
@@ -376,9 +432,25 @@ export const CollaborativePage = (onExit?: () => void) => {
       }
       render();
     });
+    byId("focused-research")?.addEventListener("click", async () => {
+      try {
+        const result = await jsonFetch(`/api/research/references?ids=${encodeURIComponent(options?.focusedEntityId ?? "")}`);
+        searchOutput = JSON.stringify(result, null, 2);
+      } catch (error: any) {
+        searchOutput = error.message;
+      }
+      render();
+    });
   };
 
-  refresh().then(render);
+  refresh()
+    .then(async () => {
+      if (options?.focusedEntityId) {
+        const result = await jsonFetch(`/api/research/references?ids=${encodeURIComponent(options.focusedEntityId)}`);
+        searchOutput = JSON.stringify(result, null, 2);
+      }
+    })
+    .then(render);
 
   return {
     element: root,
