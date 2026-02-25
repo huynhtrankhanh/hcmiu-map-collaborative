@@ -26,3 +26,4 @@
   * The resolution of a trial does not prevent anyone from continuing the discussion. Discussions can continue long after the resolution of a trial.
   * The court trial itself is an entity and can be referenced.
 * Deep research capability
+  * Capability 1:
