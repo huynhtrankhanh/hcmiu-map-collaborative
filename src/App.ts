@@ -13,7 +13,9 @@ import { generateRandomString } from "./generateRandomString";
 import { solveTravelingSalesman } from "./solveTravelingSalesman";
 import { CollaborativePage } from "./CollaborativePage";
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE_URL ??
+  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
 const PageIntro = (icon: string, title: string, subtitle: string) =>
   h(
     "div.mb-4.border.border-slate-400/30.rounded-xl.p-4",

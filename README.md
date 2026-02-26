@@ -45,18 +45,21 @@ It began as a data structures and algorithms course project and remains open-sou
 ```bash
 npm install
 docker compose up -d arangodb
+npm run build
 npm run dev:backend
-npm run dev
 ```
 
-frontend: `http://localhost:5173`  
-backend: `http://localhost:3000`
+app (frontend + backend): `http://localhost:3000`
 
 ### Docker Compose
 
 ```bash
 docker compose up --build
 ```
+
+### Mobile builds
+
+The Capacitor/Android build pipeline has been removed so the backend can serve the built frontend directly without origin whitelisting. Use the web deployment instead.
 
 ### Tests
 

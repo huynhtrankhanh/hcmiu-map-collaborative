@@ -18,23 +18,11 @@ services:
       ARANGO_DATABASE: hcmiu_map
       ARANGO_USER: root
       ARANGO_PASSWORD: changeme
-      FRONTEND_ORIGIN: http://localhost:5173
     ports:
       - "3000:3000"
     restart: on-failure
     depends_on:
       - arangodb
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      VITE_API_BASE_URL: http://localhost:3000
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
 
 volumes:
   arangodb_data:

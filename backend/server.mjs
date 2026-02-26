@@ -1,5 +1,8 @@
 import crypto from "node:crypto";
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import { WebSocketServer } from "ws";
 import { Database } from "arangojs";
@@ -8,6 +11,8 @@ import { v4 as uuidv4 } from "uuid";
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const randomSalt = () => crypto.randomBytes(16).toString("base64");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distPath = path.resolve(__dirname, "../dist");
 
 class ArangoStore {
   constructor(url, databaseName, username, password) {
@@ -175,7 +180,6 @@ export async function createServer(options = {}) {
     arangoDatabase = process.env.ARANGO_DATABASE ?? "hcmiu_map",
     arangoUser = process.env.ARANGO_USER ?? "root",
     arangoPassword = process.env.ARANGO_PASSWORD ?? "changeme",
-    allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
   } = options;
 
   const store = new ArangoStore(arangoUrl, arangoDatabase, arangoUser, arangoPassword);
@@ -196,7 +200,7 @@ export async function createServer(options = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
     if (req.method === "OPTIONS") return res.status(204).end();
@@ -619,6 +623,14 @@ export async function createServer(options = {}) {
     items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res.json({ items: items.slice(0, limit) });
   });
+
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api") || req.path.startsWith("/ws")) return next();
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
 
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: "/ws" });
