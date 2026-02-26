@@ -30,6 +30,12 @@ demo: **https://hcmiumap.huynhtrankhanh.com/**
 
 It began as a data structures and algorithms course project and remains open-source. The codebase is actively extended as a collaborative demo platform through community-driven improvements and small maintenance updates, with no guaranteed release cadence. It is not operated as a production-grade navigation service (for example, no GPS hardware integration is planned). Treat it as a proof-of-concept you can run, study, and build upon. Contributions are welcome to make it more robust.
 
+### Serious vs. satirical value
+
+- **Serious utility:** The navigation, entity graph, and discussion model are genuinely useful for campus wayfinding, knowledge capture, and transparent governance experiments. The research APIs and WebSocket-driven updates are built to showcase realistic collaboration patterns.
+- **Playful tone:** Some features (e.g., “court trials” with judges and votes) embrace a tongue-in-cheek framing to explore moderation and accountability in a campus context. They are intended as an educational sandbox, not legal processes.
+- **How to use it responsibly:** If you adapt this project, clarify community norms, moderation guidelines, and data accuracy expectations. Keep in mind it lacks production guarantees (uptime/SLA, GPS precision, or safety-critical routing) and should be treated as a learning and prototyping platform.
+
 ## Getting started
 
 ```bash
