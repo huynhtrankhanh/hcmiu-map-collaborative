@@ -198,7 +198,7 @@ export async function createServer(options = {}) {
   app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
     if (req.method === "OPTIONS") return res.status(204).end();
     next();
   });
@@ -467,6 +467,9 @@ export async function createServer(options = {}) {
       status: "pending_agreement",
       outcome: null,
       createdAt: trialEntity.createdAt,
+      lastProposedJudges: [],
+      lastProposedBy: null,
+      judgeNegotiationHistory: [],
     };
     await store.createTrial(trial);
     sendWs({ type: "trial.created", trial });
@@ -482,6 +485,15 @@ export async function createServer(options = {}) {
   app.post("/api/trials/:id/propose-judges", auth, async (req, res) => {
     const trial = await store.getTrial(req.params.id);
     if (!trial) return res.status(404).json({ error: "trial not found" });
+    if (trial.status !== "pending_agreement") return res.status(400).json({ error: "trial is not in pending_agreement status" });
+
+    const isPlaintiff = req.user.id === trial.plaintiffUserId;
+    const isDefendant = req.user.id === trial.defendantUserId;
+    if (!isPlaintiff && !isDefendant) return res.status(403).json({ error: "only plaintiff/defendant can propose judges" });
+
+    if (trial.lastProposedBy && trial.lastProposedBy === req.user.id) {
+      return res.status(400).json({ error: "it is the other party's turn to respond" });
+    }
 
     const judges = (Array.isArray(req.body.judges) ? req.body.judges : []).map((j) => `${j}`.trim()).filter(Boolean);
     const judgeUsers = [];
@@ -491,21 +503,46 @@ export async function createServer(options = {}) {
       judgeUsers.push(user.id);
     }
 
-    if (req.user.id === trial.plaintiffUserId) trial.plaintiffProposedJudges = judgeUsers;
-    else if (req.user.id === trial.defendantUserId) trial.defendantProposedJudges = judgeUsers;
-    else return res.status(403).json({ error: "only plaintiff/defendant can propose judges" });
+    if (!trial.judgeNegotiationHistory) trial.judgeNegotiationHistory = [];
+    trial.judgeNegotiationHistory.push({
+      proposedBy: req.user.id,
+      judges: judgeUsers,
+      timestamp: new Date().toISOString(),
+    });
 
-    const sortedPlaintiff = [...trial.plaintiffProposedJudges].sort().join(",");
-    const sortedDefendant = [...trial.defendantProposedJudges].sort().join(",");
-    if (sortedPlaintiff && sortedPlaintiff === sortedDefendant) {
-      trial.agreedJudges = [...trial.plaintiffProposedJudges];
-      trial.status = "active";
-    } else {
-      trial.status = "pending_agreement";
-      trial.agreedJudges = [];
-      trial.votes = {};
-      trial.outcome = null;
-    }
+    if (isPlaintiff) trial.plaintiffProposedJudges = judgeUsers;
+    else trial.defendantProposedJudges = judgeUsers;
+    trial.lastProposedJudges = judgeUsers;
+    trial.lastProposedBy = req.user.id;
+
+    await store.updateTrial(trial);
+    sendWs({ type: "trial.updated", trial });
+    res.json({ trial });
+  });
+
+  app.post("/api/trials/:id/accept-judges", auth, async (req, res) => {
+    const trial = await store.getTrial(req.params.id);
+    if (!trial) return res.status(404).json({ error: "trial not found" });
+    if (trial.status !== "pending_agreement") return res.status(400).json({ error: "trial is not in pending_agreement status" });
+    if (!trial.lastProposedBy || !trial.lastProposedJudges?.length) return res.status(400).json({ error: "no proposal to accept" });
+
+    const isPlaintiff = req.user.id === trial.plaintiffUserId;
+    const isDefendant = req.user.id === trial.defendantUserId;
+    if (!isPlaintiff && !isDefendant) return res.status(403).json({ error: "only plaintiff/defendant can accept judges" });
+
+    if (trial.lastProposedBy === req.user.id) return res.status(400).json({ error: "cannot accept your own proposal" });
+
+    trial.agreedJudges = [...trial.lastProposedJudges];
+    trial.plaintiffProposedJudges = [...trial.lastProposedJudges];
+    trial.defendantProposedJudges = [...trial.lastProposedJudges];
+    trial.status = "active";
+
+    if (!trial.judgeNegotiationHistory) trial.judgeNegotiationHistory = [];
+    trial.judgeNegotiationHistory.push({
+      acceptedBy: req.user.id,
+      judges: trial.agreedJudges,
+      timestamp: new Date().toISOString(),
+    });
 
     await store.updateTrial(trial);
     sendWs({ type: "trial.updated", trial });
@@ -548,6 +585,39 @@ export async function createServer(options = {}) {
     const result = await store.shortestReferencePath(from, to);
     if (!result) return res.status(404).json({ error: "no path" });
     res.json(result);
+  });
+
+  app.get("/api/activity", async (req, res) => {
+    const requestedLimit = Number(req.query.limit) || 50;
+    const limit = Math.min(Math.max(requestedLimit, 1), 200);
+    const [recentEntities, recentTrials] = await Promise.all([
+      store.listEntities({}),
+      store.listTrials(),
+    ]);
+    const items = [];
+    for (const entity of recentEntities) {
+      items.push({
+        type: entity.type === "comment" ? "comment" : entity.type === "trial" ? "trial_entity" : entity.type,
+        id: entity.id,
+        title: entity.title,
+        body: entity.body,
+        createdBy: entity.createdBy,
+        parentEntityId: entity.parentEntityId || null,
+        createdAt: entity.createdAt,
+      });
+    }
+    for (const trial of recentTrials) {
+      items.push({
+        type: "trial_update",
+        id: trial.id,
+        title: `Trial ${trial.id}`,
+        body: `Status: ${trial.status}${trial.outcome ? `, Outcome: ${trial.outcome}` : ""}`,
+        createdBy: trial.plaintiffUserId,
+        createdAt: trial.createdAt,
+      });
+    }
+    items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json({ items: items.slice(0, limit) });
   });
 
   const server = http.createServer(app);

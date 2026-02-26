@@ -97,6 +97,15 @@ When a comment is created, the backend automatically adds a reference to the com
 
 Followers receive in-app notifications when new comments are added to followed entities.
 
+### Unfollow entity
+`POST /api/entities/:id/unfollow` (auth required)
+
+### Edit entity
+`PATCH /api/entities/:id` (auth required, creator only)
+
+### Delete entity
+`DELETE /api/entities/:id` (auth required, creator only)
+
 ## Notifications
 - `GET /api/notifications` (auth)
 - `POST /api/notifications/:id/read` (auth)
@@ -115,13 +124,35 @@ Followers receive in-app notifications when new comments are added to followed e
 
 Each trial is also represented by a `trial` entity (`entityId` in trial object).
 
-### Propose judges
-`POST /api/trials/:id/propose-judges` (auth)
-```json
-{ "judges": ["judge1", "judge2"] }
-```
+### Interactive Judge Agreement Dialogue
 
-Both plaintiff and defendant must propose the same judge set before trial becomes active.
+Judge agreement is now an interactive back-and-forth negotiation between plaintiff and defendant:
+
+1. **Plaintiff proposes judges:**
+   `POST /api/trials/:id/propose-judges` (auth)
+   ```json
+   { "judges": ["judge1", "judge2"] }
+   ```
+
+2. **Defendant responds:** The defendant can either:
+   - **Accept** the proposal: `POST /api/trials/:id/accept-judges` (auth) — trial becomes `active`
+   - **Counter-propose** a different set: `POST /api/trials/:id/propose-judges` (auth) with a new judge list
+
+3. **Plaintiff responds:** If the defendant counter-proposed, the plaintiff can:
+   - **Accept** the counter-proposal: `POST /api/trials/:id/accept-judges` (auth)
+   - **Counter-propose** again: `POST /api/trials/:id/propose-judges` (auth)
+
+4. This back-and-forth continues until one party accepts the other's proposal.
+
+**Rules:**
+- Only the party whose turn it is can propose (the other party must respond first).
+- A party cannot accept their own proposal.
+- The trial tracks `lastProposedBy`, `lastProposedJudges`, and a full `judgeNegotiationHistory`.
+
+**Error responses:**
+- `400` if it's not the caller's turn to propose
+- `400` if trying to accept own proposal
+- `403` if the caller is not plaintiff or defendant
 
 ### Vote
 `POST /api/trials/:id/vote` (auth)
@@ -150,15 +181,60 @@ Implemented with ArangoDB AQL text filtering against entity titles/bodies.
 Returns shortest reference-distance path and entities on that path.  
 Reference relationships are treated as bidirectional (undirected graph) using ArangoDB `ANY SHORTEST_PATH` traversal over `entity_references`.
 
+## Activity Feed
+
+### Get recent activity
+`GET /api/activity`
+
+Optional query params:
+- `limit` — number of items to return (default: 50, max: 200)
+
+Returns a chronologically sorted list of recent activity items including entity creations, comments, and trial updates:
+```json
+{
+  "items": [
+    {
+      "type": "post",
+      "id": "entity_xxx",
+      "title": "My Post",
+      "body": "...",
+      "createdBy": "user_xxx",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+Item types: `post`, `comment`, `user`, `map_location`, `trial_entity`, `trial_update`
+
 ## Real-time updates (WebSocket)
 Connect to:
 `ws://localhost:3000/ws?token=<bearer-token>`
 
 Event types include:
 - `entity.created`
+- `entity.updated`
+- `entity.deleted`
 - `trial.created`
 - `trial.updated`
 - `notification.created`
+
+## Frontend Pages
+
+The collaborative UI is organized into separate pages for a cleaner experience:
+
+| Page | Description |
+|------|-------------|
+| **Hub** | Overview dashboard with stats and navigation |
+| **Auth** | Login and signup |
+| **Entities** | Browse, create, comment on entities with search-based reference selection |
+| **Trials** | Court of justice with interactive judge agreement dialogue |
+| **Research** | Deep research tools (reference search, full-text search, degree of separation) |
+| **Notifications** | View in-app notifications |
+| **Activity** | Chronological feed of recent activity |
+| **Tutorial** | Step-by-step guide on how to use the platform |
+
+Entity references can be added by searching for entities (instead of manually typing IDs). Manual ID input is retained as an "Expert" option.
 
 ## Tests
 - API: `npm run test:api`

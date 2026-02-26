@@ -147,16 +147,22 @@ const run = async () => {
     await page.waitForFunction(() => document.body.textContent?.includes("Open in HCMIU Collaborative"));
     await clickButtonByText(page, "Open in HCMIU Collaborative");
 
-    await page.waitForFunction(() => document.body.textContent?.includes("Focused from map view"));
-    await page.waitForSelector("#username");
+    // New multi-page UI: should land on entities sub-page when focused
+    await page.waitForFunction(() => document.body.textContent?.includes("Entities"));
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-entities-page.png"), fullPage: true });
 
-    // Login via UI and create content
+    // Navigate to Auth page and login
+    await clickButtonByText(page, "🔐 Auth");
+    await page.waitForSelector("#username");
     await page.type("#username", plaintiffUser);
     await page.type("#password", password);
     await page.click("#login");
     await page.waitForFunction(() => document.body.textContent?.includes("Logged in as"), { timeout: 30_000 });
-    await page.screenshot({ path: path.join(screenshotDir, "collaborative-page.png"), fullPage: true });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-auth-page.png"), fullPage: true });
 
+    // Navigate to Entities page and create entity
+    await clickButtonByText(page, "📡 Entities");
+    await page.waitForSelector("#entity-title");
     await page.type("#entity-title", "E2E Core Entity");
     await page.type("#entity-body", "Created in comprehensive docker-compose e2e test");
     await page.click("#create-entity");
@@ -205,6 +211,7 @@ const run = async () => {
     const defendantNotifications = await fetchJson("/api/notifications", {}, defendant.token);
     if (!defendantNotifications.notifications.length) throw new Error("expected notifications for follower");
 
+    // Trial with interactive judge dialogue
     const trial = await fetchJson(
       "/api/trials",
       {
@@ -213,10 +220,38 @@ const run = async () => {
       },
       plaintiff.token
     );
+    // Plaintiff proposes judges
     await fetchJson(`/api/trials/${trial.trial.id}/propose-judges`, { method: "POST", body: JSON.stringify({ judges: [judgeUser] }) }, plaintiff.token);
-    await fetchJson(`/api/trials/${trial.trial.id}/propose-judges`, { method: "POST", body: JSON.stringify({ judges: [judgeUser] }) }, defendant.token);
+    // Defendant accepts the proposal
+    await fetchJson(`/api/trials/${trial.trial.id}/accept-judges`, { method: "POST" }, defendant.token);
+    // Judge votes
     const voted = await fetchJson(`/api/trials/${trial.trial.id}/vote`, { method: "POST", body: JSON.stringify({ vote: "plaintiff" }) }, judge.token);
     if (voted.trial.status !== "resolved") throw new Error("expected trial resolution");
+
+    // Navigate to Trials page and take screenshot
+    await clickButtonByText(page, "⚖️ Trials");
+    await page.waitForFunction(() => document.body.textContent?.includes("Court of Justice"));
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-trials-page.png"), fullPage: true });
+
+    // Navigate to Activity Feed and take screenshot
+    await clickButtonByText(page, "📰 Activity");
+    await page.waitForFunction(() => document.body.textContent?.includes("Activity Feed"));
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-activity-page.png"), fullPage: true });
+
+    // Navigate to Research page and take screenshot
+    await clickButtonByText(page, "🔎 Research");
+    await page.waitForFunction(() => document.body.textContent?.includes("Deep Research"));
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-research-page.png"), fullPage: true });
+
+    // Navigate to Notifications page and take screenshot
+    await clickButtonByText(page, "🔔 Notifications");
+    await page.waitForFunction(() => document.body.textContent?.includes("Notifications"));
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-notifications-page.png"), fullPage: true });
+
+    // Navigate to Tutorial page and take screenshot
+    await clickButtonByText(page, "📖 Tutorial");
+    await page.waitForFunction(() => document.body.textContent?.includes("How to Use HCMIU Collaborative"));
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-tutorial-page.png"), fullPage: true });
 
     const refs = await fetchJson(`/api/research/references?ids=${encodeURIComponent(createdEntityId)}`);
     if (!refs.entities.length) throw new Error("expected referencing entities");
@@ -226,6 +261,10 @@ const run = async () => {
 
     const degree = await fetchJson(`/api/research/degree?from=${encodeURIComponent(createdEntityId)}&to=${encodeURIComponent(refs.entities[0].id)}`);
     if (!degree.path.length) throw new Error("expected non-empty degree path");
+
+    // Activity feed API check
+    const activity = await fetchJson("/api/activity?limit=10");
+    if (!activity.items.length) throw new Error("expected activity items");
 
     await browser.close();
     console.log("Comprehensive Puppeteer/API E2E passed against Docker Compose stack");
