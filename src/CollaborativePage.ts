@@ -333,8 +333,18 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             const lastProposalInfo = trial.lastProposedBy
               ? `<div class="text-xs text-orange-600 mt-1">Last proposal by: ${escapeHtml(trial.lastProposedBy)} — Judges: ${(trial.lastProposedJudges || []).map((j: string) => escapeHtml(j)).join(", ")}</div>`
               : "";
-            const canAccept = token && trial.status === "pending_agreement" && trial.lastProposedBy && trial.lastProposedBy !== me?.id && (me?.id === trial.plaintiffUserId || me?.id === trial.defendantUserId);
-            const canPropose = token && trial.status === "pending_agreement" && (me?.id === trial.plaintiffUserId || me?.id === trial.defendantUserId) && (!trial.lastProposedBy || trial.lastProposedBy !== me?.id);
+            const canAccept = (() => {
+              if (!token || trial.status !== "pending_agreement") return false;
+              if (!trial.lastProposedBy || !trial.lastProposedJudges?.length) return false;
+              if (trial.lastProposedBy === me?.id) return false;
+              return me?.id === trial.plaintiffUserId || me?.id === trial.defendantUserId;
+            })();
+            const canPropose = (() => {
+              if (!token || trial.status !== "pending_agreement") return false;
+              const isParticipant = me?.id === trial.plaintiffUserId || me?.id === trial.defendantUserId;
+              if (!isParticipant) return false;
+              return !trial.lastProposedBy || trial.lastProposedBy !== me?.id;
+            })();
             const canVote = token && trial.status === "active" && trial.agreedJudges?.includes(me?.id);
             return `
               <div class="border rounded p-3 mb-3">

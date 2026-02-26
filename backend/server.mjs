@@ -491,11 +491,8 @@ export async function createServer(options = {}) {
     const isDefendant = req.user.id === trial.defendantUserId;
     if (!isPlaintiff && !isDefendant) return res.status(403).json({ error: "only plaintiff/defendant can propose judges" });
 
-    if (trial.lastProposedBy) {
-      const lastWasPlaintiff = trial.lastProposedBy === trial.plaintiffUserId;
-      if ((isPlaintiff && lastWasPlaintiff) || (isDefendant && !lastWasPlaintiff)) {
-        return res.status(400).json({ error: "it is the other party's turn to respond" });
-      }
+    if (trial.lastProposedBy && trial.lastProposedBy === req.user.id) {
+      return res.status(400).json({ error: "it is the other party's turn to respond" });
     }
 
     const judges = (Array.isArray(req.body.judges) ? req.body.judges : []).map((j) => `${j}`.trim()).filter(Boolean);
@@ -591,7 +588,8 @@ export async function createServer(options = {}) {
   });
 
   app.get("/api/activity", async (req, res) => {
-    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    const requestedLimit = Number(req.query.limit) || 50;
+    const limit = Math.min(Math.max(requestedLimit, 1), 200);
     const [recentEntities, recentTrials] = await Promise.all([
       store.listEntities({}),
       store.listTrials(),
