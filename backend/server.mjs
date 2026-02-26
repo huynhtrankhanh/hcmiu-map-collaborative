@@ -13,6 +13,8 @@ const randomSalt = () => crypto.randomBytes(16).toString("base64");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.resolve(__dirname, "../dist");
+const API_PATH_PREFIX = "/api";
+const WS_PATH_PREFIX = "/ws";
 
 class ArangoStore {
   constructor(url, databaseName, username, password) {
@@ -199,13 +201,6 @@ export async function createServer(options = {}) {
 
   const app = express();
   app.use(express.json());
-  app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
-    if (req.method === "OPTIONS") return res.status(204).end();
-    next();
-  });
 
   const sessions = new Map();
   const signupChallenges = new Map();
@@ -627,7 +622,10 @@ export async function createServer(options = {}) {
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
     app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api") || req.path.startsWith("/ws")) return next();
+      // Keep SPA fallback isolated from backend and WebSocket endpoints.
+      const isApiRoute = req.path === API_PATH_PREFIX || req.path.startsWith(`${API_PATH_PREFIX}/`);
+      const isWsRoute = req.path === WS_PATH_PREFIX || req.path.startsWith(`${WS_PATH_PREFIX}/`);
+      if (isApiRoute || isWsRoute) return next();
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
