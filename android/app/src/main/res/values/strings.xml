@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">HCMIU Map</string>
-    <string name="title_activity_main">HCMIU Map</string>
-    <string name="package_name">com.huynhtrankhanh.hcmiumap</string>
-    <string name="custom_url_scheme">com.huynhtrankhanh.hcmiumap</string>
-</resources>

@@ -1,7 +1,9 @@
 import h from "hyperscript";
 import sodium from "libsodium-wrappers-sumo";
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE_URL ??
+  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
 
 const jsonFetch = async (path: string, options: RequestInit = {}, token?: string) => {
   const response = await fetch(`${API_BASE}${path}`, {
