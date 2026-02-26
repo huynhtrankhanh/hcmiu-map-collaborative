@@ -32,9 +32,13 @@ It began as a data structures and algorithms course project and remains open-sou
 
 ### Serious vs. satirical value
 
-- **Serious utility:** The navigation, entity graph, and discussion model are genuinely useful for campus wayfinding, knowledge capture, and transparent governance experiments. The research APIs and WebSocket-driven updates are built to showcase realistic collaboration patterns.
-- **Playful tone:** Some features (e.g., “court trials” with judges and votes) embrace a tongue-in-cheek framing to explore moderation and accountability in a campus context. They are intended as an educational sandbox, not legal processes.
-- **How to use it responsibly:** If you adapt this project, clarify community norms, moderation guidelines, and data accuracy expectations. Keep in mind it lacks production guarantees (uptime/SLA, GPS precision, or safety-critical routing) and should be treated as a learning and prototyping platform.
+- **Serious utility (why it matters):** The navigation, entity graph, and discussion model are genuinely useful for campus wayfinding, knowledge capture, and transparent governance experiments. Research APIs and WebSocket-driven updates demonstrate real-time collaboration patterns that mirror modern platforms (follows, notifications, graph queries, and shortest-path calculations).
+- **Playful and satirical edges (why it is also exploratory):** Features like “court trials” with judges and votes intentionally lean into a tongue-in-cheek framing of campus politics and moderation. They are not a legal system; they are a sandbox to think about decision-making, incentives, and accountability with low stakes and humor.
+- **Practical adoption guidance:** If you deploy this beyond a demo, publish norms for civility, accuracy, and moderation; document who curates data; and set expectations for response times. Make it clear to users where satire ends and operational guidance begins to avoid confusion.
+- **Safety and accuracy caveats:** The project ships without SLAs, GPS-grade positioning, or hazard-aware routing. Do not rely on it for emergency egress, safety-critical directions, or official record-keeping. Encourage users to verify directions on-site and to flag stale data.
+- **Examples of serious use:** Orientation teams can preload vetted room descriptions and annotate accessibility paths; clubs can pin event logistics to rooms; researchers can analyze cross-entity references to understand collaboration patterns.
+- **Examples of satirical/experimental use:** Student groups can run mock “trials” to debate cafeteria playlist choices or lab etiquette, using votes and comments to illustrate governance concepts without real-world consequences.
+- **Contribution expectations:** Treat contributions as collaborative research and learning. Submit improvements that enhance clarity, resilience, and inclusivity. If you add playful features, label them clearly; if you add operational ones, document maintenance and reliability assumptions.
 
 ## Getting started
 
