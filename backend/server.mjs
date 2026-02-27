@@ -621,7 +621,7 @@ export async function createServer(options = {}) {
 
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
-    app.get("*", (req, res, next) => {
+    app.get(/.*/, (req, res, next) => {
       // Keep SPA fallback isolated from backend and WebSocket endpoints.
       const isApiRoute = req.path === API_PATH_PREFIX || req.path.startsWith(`${API_PATH_PREFIX}/`);
       const isWsRoute = req.path === WS_PATH_PREFIX || req.path.startsWith(`${WS_PATH_PREFIX}/`);
