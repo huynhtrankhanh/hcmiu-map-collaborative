@@ -1,5 +1,6 @@
 import h from "hyperscript";
 import sodium from "libsodium-wrappers-sumo";
+import { MapView } from "./MapView";
 
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE_URL ??
@@ -41,6 +42,16 @@ const hashClientPassword = async (password: string, saltBase64: string) => {
 
 const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+const resolveMapEntityId = async (constructName: string, floor: number) => {
+  const result = await jsonFetch(
+    `/api/map/entity?constructName=${encodeURIComponent(constructName)}&floor=${encodeURIComponent(String(floor))}`
+  );
+  return {
+    id: result.entity?.id as string,
+    label: `Floor ${floor}: ${constructName}`,
+  };
+};
 
 type CollaborativePageOptions = {
   focusedEntityId?: string;
@@ -100,6 +111,8 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
     const resultsContainer = panel.querySelector(`#${inputId}-results`) as HTMLElement | null;
     const selectedContainer = panel.querySelector(`#${selectedIdsContainerId}`) as HTMLElement | null;
     const expertInput = panel.querySelector(`#${inputId}-expert`) as HTMLInputElement | null;
+    const mapContainer = panel.querySelector(`#${inputId}-map`) as HTMLElement | null;
+    const mapSelected = panel.querySelector(`#${inputId}-map-selected`) as HTMLElement | null;
     if (!searchInput || !resultsContainer || !selectedContainer) return { getSelectedIds: () => [] as string[] };
 
     const selectedIds: string[] = [];
@@ -164,6 +177,25 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       });
     }
 
+    if (mapContainer) {
+      const mapView = MapView({
+        type: "browse",
+        onChoose: async (payload) => {
+          try {
+            const resolved = await resolveMapEntityId(payload.constructName, payload.floor);
+            if (resolved.id && !selectedIds.includes(resolved.id)) {
+              selectedIds.push(resolved.id);
+              renderSelected();
+            }
+            if (mapSelected) mapSelected.textContent = `Added: ${resolved.label} → ${resolved.id}`;
+          } catch (error: any) {
+            if (mapSelected) mapSelected.textContent = `Map selection failed: ${error.message}`;
+          }
+        },
+      });
+      mapContainer.appendChild(mapView.element);
+    }
+
     return { getSelectedIds: () => [...selectedIds] };
   };
 
@@ -173,6 +205,8 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
     const resultsContainer = panel.querySelector(`#${inputId}-results`) as HTMLElement | null;
     const selectedDisplay = panel.querySelector(`#${inputId}-selected`) as HTMLElement | null;
     const expertInput = panel.querySelector(`#${inputId}-expert`) as HTMLInputElement | null;
+    const mapContainer = panel.querySelector(`#${inputId}-map`) as HTMLElement | null;
+    const mapSelected = panel.querySelector(`#${inputId}-map-selected`) as HTMLElement | null;
     if (!searchInput || !resultsContainer) return { getSelectedId: () => "" };
 
     let selectedId = "";
@@ -214,6 +248,23 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         expertInput.value = "";
         renderSelected();
       });
+    }
+
+    if (mapContainer) {
+      const mapView = MapView({
+        type: "browse",
+        onChoose: async (payload) => {
+          try {
+            const resolved = await resolveMapEntityId(payload.constructName, payload.floor);
+            selectedId = resolved.id;
+            renderSelected();
+            if (mapSelected) mapSelected.textContent = `Selected: ${resolved.label} → ${resolved.id}`;
+          } catch (error: any) {
+            if (mapSelected) mapSelected.textContent = `Map selection failed: ${error.message}`;
+          }
+        },
+      });
+      mapContainer.appendChild(mapView.element);
     }
 
     return { getSelectedId: () => selectedId };
@@ -310,11 +361,16 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             <input id="entity-title" class="border p-2 w-full mb-2" placeholder="Title" />
             <textarea id="entity-body" class="border p-2 w-full mb-2" placeholder="Body"></textarea>
             <div class="mb-2">
-              <label class="text-sm font-semibold">References (search to add):</label>
+              <label class="text-sm font-semibold">References (three methods: search, map, manual):</label>
+              <label class="text-xs text-gray-600">Method 1 — Search</label>
               <input id="ref-search" class="border p-2 w-full mb-1" placeholder="Search entities to reference..." />
               <div id="ref-search-results" class="max-h-40 overflow-auto"></div>
+              <details class="mt-2"><summary class="text-xs text-gray-500 cursor-pointer">Method 2 — Select on Map</summary>
+                <div id="ref-search-map-selected" class="text-xs text-gray-600 mt-1">No map entity selected yet.</div>
+                <div id="ref-search-map" class="mt-1 overflow-auto border rounded p-1 bg-white"></div>
+              </details>
               <div id="ref-selected" class="mt-1 flex flex-wrap"></div>
-              <details class="mt-1"><summary class="text-xs text-gray-500 cursor-pointer">Expert: Add by ID</summary>
+              <details class="mt-1"><summary class="text-xs text-gray-500 cursor-pointer">Method 3 — Manual ID entry</summary>
                 <div class="flex gap-1 mt-1"><input id="ref-search-expert" class="border p-1 flex-1 text-xs" placeholder="Entity IDs (comma-separated)" /><button id="ref-search-expert-add" class="bg-gray-500 text-white px-2 py-1 rounded text-xs">Add</button></div>
               </details>
             </div>
@@ -385,11 +441,16 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
           <h2 class="text-xl font-semibold mb-3">🔎 Deep Research</h2>
           <section class="border rounded p-3 mb-3">
             <h3 class="font-semibold mb-2">Find Referencing Entities</h3>
-            <label class="text-sm">Search for entities to check references:</label>
+            <label class="text-sm">Three methods: search, map, manual.</label>
+            <label class="text-xs text-gray-600">Method 1 — Search</label>
             <input id="research-entity-search" class="border p-2 w-full mb-1" placeholder="Search entities..." />
             <div id="research-entity-search-results" class="max-h-40 overflow-auto"></div>
+            <details class="mt-2"><summary class="text-xs text-gray-500 cursor-pointer">Method 2 — Select on Map</summary>
+              <div id="research-entity-search-map-selected" class="text-xs text-gray-600 mt-1">No map entity selected yet.</div>
+              <div id="research-entity-search-map" class="mt-1 overflow-auto border rounded p-1 bg-white"></div>
+            </details>
             <div id="research-refs-selected" class="mt-1 flex flex-wrap"></div>
-            <details class="mt-1"><summary class="text-xs text-gray-500 cursor-pointer">Expert: Enter IDs directly</summary>
+            <details class="mt-1"><summary class="text-xs text-gray-500 cursor-pointer">Method 3 — Manual ID entry</summary>
               <div class="flex gap-1 mt-1"><input id="research-entity-search-expert" class="border p-1 flex-1 text-xs" placeholder="Entity IDs (comma-separated)" /><button id="research-entity-search-expert-add" class="bg-gray-500 text-white px-2 py-1 rounded text-xs">Add</button></div>
             </details>
             <button id="research-by-refs" class="bg-slate-700 text-white px-3 py-2 rounded mt-2">Find Referencing Entities</button>
@@ -402,20 +463,30 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
           <section class="border rounded p-3 mb-3">
             <h3 class="font-semibold mb-2">Degree of Separation</h3>
             <div class="mb-2">
-              <label class="text-sm">From entity (search):</label>
+              <label class="text-sm">From entity (three methods: search, map, manual):</label>
+              <label class="text-xs text-gray-600">Method 1 — Search</label>
               <input id="degree-from-search" class="border p-2 w-full mb-1" placeholder="Search for source entity..." />
               <div id="degree-from-search-results" class="max-h-32 overflow-auto"></div>
+              <details class="mt-2"><summary class="text-xs text-gray-500 cursor-pointer">Method 2 — Select on Map</summary>
+                <div id="degree-from-search-map-selected" class="text-xs text-gray-600 mt-1">No map entity selected yet.</div>
+                <div id="degree-from-search-map" class="mt-1 overflow-auto border rounded p-1 bg-white"></div>
+              </details>
               <div id="degree-from-search-selected" class="mt-1"></div>
-              <details class="mt-1"><summary class="text-xs text-gray-500 cursor-pointer">Expert: Enter ID directly</summary>
+              <details class="mt-1"><summary class="text-xs text-gray-500 cursor-pointer">Method 3 — Manual ID entry</summary>
                 <div class="flex gap-1 mt-1"><input id="degree-from-search-expert" class="border p-1 flex-1 text-xs" placeholder="Entity ID" /><button id="degree-from-search-expert-set" class="bg-gray-500 text-white px-2 py-1 rounded text-xs">Set</button></div>
               </details>
             </div>
             <div class="mb-2">
-              <label class="text-sm">To entity (search):</label>
+              <label class="text-sm">To entity (three methods: search, map, manual):</label>
+              <label class="text-xs text-gray-600">Method 1 — Search</label>
               <input id="degree-to-search" class="border p-2 w-full mb-1" placeholder="Search for target entity..." />
               <div id="degree-to-search-results" class="max-h-32 overflow-auto"></div>
+              <details class="mt-2"><summary class="text-xs text-gray-500 cursor-pointer">Method 2 — Select on Map</summary>
+                <div id="degree-to-search-map-selected" class="text-xs text-gray-600 mt-1">No map entity selected yet.</div>
+                <div id="degree-to-search-map" class="mt-1 overflow-auto border rounded p-1 bg-white"></div>
+              </details>
               <div id="degree-to-search-selected" class="mt-1"></div>
-              <details class="mt-1"><summary class="text-xs text-gray-500 cursor-pointer">Expert: Enter ID directly</summary>
+              <details class="mt-1"><summary class="text-xs text-gray-500 cursor-pointer">Method 3 — Manual ID entry</summary>
                 <div class="flex gap-1 mt-1"><input id="degree-to-search-expert" class="border p-1 flex-1 text-xs" placeholder="Entity ID" /><button id="degree-to-search-expert-set" class="bg-gray-500 text-white px-2 py-1 rounded text-xs">Set</button></div>
               </details>
             </div>
@@ -471,7 +542,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             <section class="border rounded p-3">
               <h3 class="font-semibold mb-1">Step 3: Create Content</h3>
               <p>Once logged in, go to the <b>Entities</b> page. Fill in a title and body, optionally search for other entities to reference, then click <b>Create</b>. You can also comment on existing entities.</p>
-              <p>To add references, type in the search box to find entities. Click a result to add it. You can also use the <b>Expert</b> option to enter entity IDs directly.</p>
+              <p>To add references in entity-ID fields, you now have three methods: <b>Search</b>, <b>Select on Map</b>, and <b>Manual ID entry</b>.</p>
             </section>
             <section class="border rounded p-3">
               <h3 class="font-semibold mb-1">Step 4: Follow Entities</h3>
@@ -492,9 +563,9 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
               <h3 class="font-semibold mb-1">Step 6: Deep Research</h3>
               <p>The <b>Research</b> page offers three powerful tools:</p>
               <ul class="list-disc pl-5">
-                <li><b>Find Referencing Entities:</b> Search for entities that reference specific entities. Use the search box or enter IDs in expert mode.</li>
+                <li><b>Find Referencing Entities:</b> Select entity IDs using search, map selection, or manual ID entry.</li>
                 <li><b>Full-text Search:</b> Search all entities by text content.</li>
-                <li><b>Degree of Separation:</b> Find the shortest reference-path between two entities. Use search to select entities or enter IDs directly.</li>
+                <li><b>Degree of Separation:</b> Find the shortest reference-path between two entities using search, map, or manual entry for each endpoint.</li>
               </ul>
             </section>
             <section class="border rounded p-3">
