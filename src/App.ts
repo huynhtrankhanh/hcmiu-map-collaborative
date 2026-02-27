@@ -68,7 +68,7 @@ const MapViewPage = (
 
     const element = h(
       "div.flex.flex-col.items-center.justify-center.min-h-screen",
-      { style: "background:#F3F4F6" },
+      { style: "background:#000000" },
       h(
         "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
         { style: "max-width:72rem" },
@@ -163,7 +163,7 @@ const ShortestPathPage = (onExit?: () => void) => {
         );
         const element = h(
           "div.flex.flex-col.items-center.justify-center.min-h-screen",
-          { style: "background:#F3F4F6" },
+          { style: "background:#000000" },
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full.max-w-md",
             PageIntro("🧭", "Shortest Path Planner", "Set source and destination, then compute the most efficient route."),
@@ -226,7 +226,7 @@ const ShortestPathPage = (onExit?: () => void) => {
         });
         const element = h(
           "div.flex.flex-col.items-center.justify-center.min-h-screen",
-          { style: "background:#F3F4F6" },
+          { style: "background:#000000" },
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
             { style: "max-width:72rem" },
@@ -247,7 +247,7 @@ const ShortestPathPage = (onExit?: () => void) => {
       case "show shortest path": {
         const element = h(
           "div.flex.flex-col.items-center.justify-center.min-h-screen",
-          { style: "background:#F3F4F6" }
+          { style: "background:#000000" }
         );
         root.appendChild(element);
 
@@ -351,7 +351,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
 
         const element = h(
           "div.flex.flex-col.items-center.justify-center.min-h-screen",
-          { style: "background:#F3F4F6" },
+          { style: "background:#000000" },
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full.max-w-md",
             PageIntro("📍", "Traveling Salesman Optimizer", "Add multiple destinations and generate an efficient visit order."),
@@ -413,7 +413,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
         });
         const element = h(
           "div.flex.flex-col.items-center.justify-center.min-h-screen",
-          { style: "background:#F3F4F6" },
+          { style: "background:#000000" },
           h(
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
             { style: "max-width:72rem" },
@@ -441,7 +441,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
 
         const element = h(
           "div.flex.flex-col.items-center.justify-center.min-h-screen",
-          { style: "background:#F3F4F6" }
+          { style: "background:#000000" }
         );
         container.appendChild(element);
 
@@ -528,7 +528,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
       case "hcmiu map pro": {
         const element = h(
           "div.flex.flex-col.items-center.justify-center.min-h-screen",
-          { style: "background:#F3F4F6" },
+          { style: "background:#000000" },
           h(
             "div.flex.flex-col.items-center.justify-center",
             h(
