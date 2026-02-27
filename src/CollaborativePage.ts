@@ -224,7 +224,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
 
     const container = h(
       "div.flex.flex-col.items-center.justify-center.min-h-screen",
-      { style: "background:#F3F4F6" },
+      { style: "background:#000000" },
       h("div.bg-white.p-6.rounded-lg.shadow-md.w-full", { style: "max-width:72rem" })
     );
     const panel = container.querySelector("div")!;

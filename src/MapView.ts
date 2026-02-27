@@ -30,8 +30,6 @@ export const MapView = (
     mapElement.appendChild(floors[currentFloor].element());
     if (config?.type === "choose on map") {
       mapElement
-        .querySelectorAll("[data-isstairs]")
-        .forEach((node: Element) => ((node as HTMLDivElement).style.opacity = "30%"));
       mapElement.querySelectorAll("[data-isconstruct]").forEach((construct: Element) => {
         construct.addEventListener("click", () => {
           config.onChoose(
