@@ -36,7 +36,7 @@ export function SuggestBox(
 
     return [
       beforeMatch,
-      h("strong", { style: { backgroundColor: "#ffeb3b" } }, match),
+      h("strong", { style: { backgroundColor: "#ffffff", color: "#000000" } }, match),
       afterMatch,
     ];
   };
