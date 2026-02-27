@@ -28,8 +28,17 @@ export const MapView = (
   const renderCurrentFloor = () => {
     mapElement.innerHTML = "";
     mapElement.appendChild(floors[currentFloor].element());
+    const selectConstruct = (construct: Element) => {
+      mapElement.querySelectorAll("[data-constructselected]").forEach((x: Element) => {
+        x.removeAttribute("data-constructselected");
+        (x as HTMLDivElement).style.fontWeight = "";
+        (x as HTMLDivElement).style.textDecoration = "";
+      });
+      construct.setAttribute("data-constructselected", "");
+      (construct as HTMLDivElement).style.fontWeight = "bold";
+      (construct as HTMLDivElement).style.textDecoration = "underline";
+    };
     if (config?.type === "choose on map") {
-      mapElement
       mapElement.querySelectorAll("[data-isconstruct]").forEach((construct: Element) => {
         construct.addEventListener("click", () => {
           config.onChoose(
@@ -38,22 +47,14 @@ export const MapView = (
               ": " +
               construct.getAttribute("data-constructname")!
           );
-          mapElement
-            .querySelectorAll("[data-constructselected]")
-            .forEach((x: Element) => {
-              x.removeAttribute("data-constructselected");
-              (x as HTMLDivElement).style.fontWeight = "";
-              (x as HTMLDivElement).style.textDecoration = "";
-            });
-          construct.setAttribute("data-constructselected", "");
-          (construct as HTMLDivElement).style.fontWeight = "bold";
-          (construct as HTMLDivElement).style.textDecoration = "underline";
+          selectConstruct(construct);
         });
       });
     }
     if (config?.type === "browse") {
       mapElement.querySelectorAll("[data-isconstruct]").forEach((construct: Element) => {
         construct.addEventListener("click", () => {
+          selectConstruct(construct);
           config.onChoose({
             constructName: construct.getAttribute("data-constructname")!,
             floor: currentFloor + 1,

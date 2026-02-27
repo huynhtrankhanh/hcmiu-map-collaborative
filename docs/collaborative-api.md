@@ -68,7 +68,7 @@ Optional query params:
 ### Map integration entity lookup
 `GET /api/map/entity?constructName=A1.109&floor=1`
 
-Returns (and lazily provisions if needed) the collaborative entity for a map location (room/stairs), plus comments and referencing count for deep integration with map view.
+Returns the collaborative entity for a map location (room/stairs), plus comments and referencing count for deep integration with map view. Map entities are provisioned during server startup.
 
 ### Create entity (auth required)
 `POST /api/entities`

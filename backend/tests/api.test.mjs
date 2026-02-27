@@ -100,6 +100,9 @@ test("comprehensive collaborative flow", async () => {
       body: JSON.stringify({ type: "post", title: "A", body: "Entity A", references: [] }),
     }, plaintiff.token);
 
+    const preprovisionedMapEntities = await fetchJsonOk(base, "/api/entities?type=map_location");
+    assert.ok(preprovisionedMapEntities.entities.some((x) => x.title === "Floor 1: A1.109"));
+
     const mapEntityResult = await fetchJsonOk(base, "/api/map/entity?constructName=A1.109&floor=1");
     assert.equal(mapEntityResult.entity.type, "map_location");
     assert.equal(mapEntityResult.comments.length, 0);
@@ -213,6 +216,11 @@ test("comprehensive collaborative flow", async () => {
 
     const fulltext = await fetchJsonOk(base, "/api/research/fulltext?q=Entity%20A");
     assert.ok(fulltext.entities.some((x) => x.id === post.entity.id));
+    const fulltextByEntityIdSubstring = await fetchJsonOk(
+      base,
+      `/api/research/fulltext?q=${encodeURIComponent(post.entity.id.slice(-8))}`
+    );
+    assert.ok(fulltextByEntityIdSubstring.entities.some((x) => x.id === post.entity.id));
 
     const degree = await fetchJsonOk(base, `/api/research/degree?from=${comment.entity.id}&to=${post.entity.id}`);
     assert.deepEqual(degree.path, [comment.entity.id, post.entity.id]);
