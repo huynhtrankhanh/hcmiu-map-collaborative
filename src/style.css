@@ -22,14 +22,14 @@ body {
 
 .min-h-screen {
   padding: 2rem 1rem;
-  background: transparent !important;
+  background: transparent;
 }
 
 .bg-white {
-  background: #000000 !important;
-  border: 3px solid #ffffff !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+  background: #000000;
+  border: 3px solid #ffffff;
+  border-radius: 0;
+  box-shadow: none;
   backdrop-filter: none;
   position: relative;
 }
@@ -38,56 +38,95 @@ body {
   display: none;
 }
 
-.bg-gray-50 {
-  background: #000000 !important;
-  border: 2px solid #ffffff !important;
-  border-radius: 0 !important;
+.bg-gray-50,
+.bg-gray-100,
+.bg-gray-200 {
+  background: #000000;
+  border: 2px solid #ffffff;
+  border-radius: 0;
 }
 
 .text-gray-900,
 .text-gray-700,
 .text-gray-600,
+.text-gray-500,
+.text-gray-800,
 .text-slate-300,
-.text-gray-400 {
-  color: #ffffff !important;
+.text-gray-400,
+.text-blue-700,
+.text-blue-800,
+.text-green-700,
+.text-green-800,
+.text-amber-800 {
+  color: #ffffff;
 }
 
+/* Button-style colored backgrounds: black with white border */
 .bg-blue-500,
 .bg-red-500,
+.bg-red-700,
 .bg-green-600,
-.bg-green-500 {
-  background: #000000 !important;
-  border: 3px solid #ffffff !important;
-  box-shadow: none !important;
-  border-radius: 0 !important;
-  color: #ffffff !important;
+.bg-green-500,
+.bg-green-700,
+.bg-gray-500,
+.bg-gray-600,
+.bg-slate-700,
+.bg-yellow-600,
+.bg-amber-600 {
+  background: #000000;
+  border: 3px solid #ffffff;
+  box-shadow: none;
+  border-radius: 0;
+  color: #ffffff;
+}
+
+/* Active/primary state: inverted colors to distinguish from normal black buttons */
+.bg-blue-600 {
+  background: #ffffff;
+  border: 2px solid #000000;
+  border-radius: 0;
+  color: #000000;
+}
+
+/* Badge-style colored backgrounds: black with white border */
+.bg-blue-100,
+.bg-green-50,
+.bg-green-100,
+.bg-amber-100 {
+  background: #000000;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+  border-radius: 0;
 }
 
 button {
   background: #000000;
   color: #ffffff;
   border: 2px solid #ffffff;
-  border-radius: 0 !important;
+  border-radius: 0;
 }
 
 button:hover {
   transform: none;
   filter: none;
-  background: #ffffff !important;
-  color: #000000 !important;
+  background: #ffffff;
+  color: #000000;
 }
 
 input,
 select,
 textarea {
-  background: #000000 !important;
-  color: #ffffff !important;
-  border: 2px solid #ffffff !important;
-  border-radius: 0 !important;
+  background: #000000;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  border-radius: 0;
 }
 
-input::placeholder {
-  color: #888888 !important;
+/* Use class-level selector to beat .placeholder-gray-400::placeholder specificity */
+input::placeholder,
+.placeholder-gray-400::placeholder {
+  color: #ffffff;
+  opacity: 1;
 }
 
 .border,
@@ -95,13 +134,13 @@ input::placeholder {
 .border-b,
 .border-l,
 .border-r {
-  border-color: #ffffff !important;
+  border-color: #ffffff;
 }
 
 .border-gray-300,
 .border-slate-400\/30,
 .divide-gray-200 > * + * {
-  border-color: #ffffff !important;
+  border-color: #ffffff;
 }
 
 .rounded,
@@ -109,37 +148,64 @@ input::placeholder {
 .rounded-lg,
 .rounded-xl,
 .rounded-full {
-  border-radius: 0 !important;
+  border-radius: 0;
 }
 
 .shadow-md,
 .shadow-lg,
 .shadow-sm {
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
+/* Range slider track: white */
 .bg-\[\#D1D5DB\] {
-  background: #ffffff !important;
+  background: #ffffff;
+}
+
+/* Map corridor areas: white background for contrast against black non-building areas */
+.bg-yellow-200 {
+  background: #ffffff;
+}
+
+/* Inside map corridors: text and borders must be black for visibility on white.
+   Using body .bg-yellow-200 * (specificity 0,1,1) to beat .border (0,1,0). */
+body .bg-yellow-200,
+body .bg-yellow-200 * {
+  color: #000000;
+  border-color: #000000;
+}
+
+/* Prevent intermediate visual shades from opacity utilities */
+.opacity-50,
+.opacity-80,
+.opacity-90 {
+  opacity: 1;
 }
 
 .text-red-500 {
-  color: #ffffff !important;
+  color: #ffffff;
   font-weight: bold;
   text-decoration: underline;
 }
 
 .text-green-500 {
-  color: #ffffff !important;
+  color: #ffffff;
   font-style: italic;
 }
 
-.hover\:bg-gray-100:hover {
-  background: #ffffff !important;
-  color: #000000 !important;
+.hover\:bg-gray-100:hover,
+.hover\:bg-blue-50:hover {
+  background: #ffffff;
+  color: #000000;
 }
 
 .focus\:bg-white:focus {
-  background: #000000 !important;
+  background: #000000;
+}
+
+/* Override arbitrary gray border on focus to keep it white */
+.focus\:border-\[#6B7280\]:focus {
+  border-color: #ffffff;
 }
 
 option {

@@ -13,6 +13,7 @@ export const dotAt = (x: number, y: number) => {
 export const labelAt = (x: number, y: number, label: string) => {
   const element = document.createElement("div");
   element.style.background = "white";
+  element.style.color = "black";
   element.style.borderRadius = "2.5px";
   element.style.position = "absolute";
   element.style.top = y + "px";
