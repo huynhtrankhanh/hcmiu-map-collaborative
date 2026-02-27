@@ -43,12 +43,15 @@ const hashClientPassword = async (password: string, saltBase64: string) => {
 const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
 const resolveMapEntityId = async (constructName: string, floor: number) => {
   const result = await jsonFetch(
     `/api/map/entity?constructName=${encodeURIComponent(constructName)}&floor=${encodeURIComponent(String(floor))}`
   );
+  if (!result.entity?.id) throw new Error(`Map entity not found for '${constructName}' on floor ${floor}`);
   return {
-    id: result.entity?.id as string,
+    id: result.entity.id as string,
     label: `Floor ${floor}: ${constructName}`,
   };
 };
@@ -188,8 +191,8 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
               renderSelected();
             }
             if (mapSelected) mapSelected.textContent = `Added: ${resolved.label} → ${resolved.id}`;
-          } catch (error: any) {
-            if (mapSelected) mapSelected.textContent = `Map selection failed: ${error.message}`;
+          } catch (error: unknown) {
+            if (mapSelected) mapSelected.textContent = `Map selection failed: ${getErrorMessage(error)}`;
           }
         },
       });
@@ -259,8 +262,8 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             selectedId = resolved.id;
             renderSelected();
             if (mapSelected) mapSelected.textContent = `Selected: ${resolved.label} → ${resolved.id}`;
-          } catch (error: any) {
-            if (mapSelected) mapSelected.textContent = `Map selection failed: ${error.message}`;
+          } catch (error: unknown) {
+            if (mapSelected) mapSelected.textContent = `Map selection failed: ${getErrorMessage(error)}`;
           }
         },
       });
