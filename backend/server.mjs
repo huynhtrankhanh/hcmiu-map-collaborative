@@ -13,6 +13,8 @@ const randomSalt = () => crypto.randomBytes(16).toString("base64");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.resolve(__dirname, "../dist");
+const mapPointToConstructNamePath = path.resolve(__dirname, "../src/mapPointToConstructName.ts");
+const liftPositionsPath = path.resolve(__dirname, "../src/liftPositions.ts");
 const API_PATH_PREFIX = "/api";
 const WS_PATH_PREFIX = "/ws";
 
@@ -152,7 +154,7 @@ class ArangoStore {
     const q = `${queryText ?? ""}`.trim().toLowerCase();
     const cursor = await this.db.query(`
       FOR e IN entities
-        FILTER @q == "" OR CONTAINS(LOWER(CONCAT_SEPARATOR(" ", e.title, e.body)), @q)
+        FILTER @q == "" OR CONTAINS(LOWER(CONCAT_SEPARATOR(" ", e.id, e.title, e.body)), @q)
         SORT e.createdAt DESC
         RETURN e
     `, { q });
@@ -174,6 +176,15 @@ class ArangoStore {
 }
 
 const toEntityId = (prefix) => `${prefix}_${uuidv4().replace(/-/g, "")}`;
+const mapEntityIdFor = (normalizedName) => `entity_map_${sha256(normalizedName).slice(0, 24)}`;
+const extractQuotedMatches = (source, regex) => [...source.matchAll(regex)].map((match) => match[1]);
+const loadMapConstructNames = () => {
+  const mapSource = fs.readFileSync(mapPointToConstructNamePath, "utf8");
+  const liftSource = fs.readFileSync(liftPositionsPath, "utf8");
+  const roomNames = extractQuotedMatches(mapSource, /"\d+":\s*"([^"]+)"/g);
+  const liftNames = extractQuotedMatches(liftSource, /"([^"]+)":\s*\d+/g);
+  return [...new Set([...roomNames, ...liftNames])];
+};
 
 export async function createServer(options = {}) {
   const {
@@ -198,6 +209,28 @@ export async function createServer(options = {}) {
     }
   }
   if (!initialized) throw lastError;
+  const mapConstructNames = loadMapConstructNames();
+  const existingMapEntities = await store.listEntities({ type: "map_location" });
+  const existingMapEntityIds = new Set(existingMapEntities.map((entity) => entity.id));
+  for (let floor = 1; floor <= 7; floor++) {
+    for (const constructName of mapConstructNames) {
+      const normalizedName = `Floor ${floor}: ${constructName}`;
+      const id = mapEntityIdFor(normalizedName);
+      if (existingMapEntityIds.has(id)) continue;
+      await store.createEntity({
+        id,
+        type: "map_location",
+        title: normalizedName,
+        body: `Collaborative thread for ${normalizedName}`,
+        parentEntityId: null,
+        references: [],
+        tags: ["map", "room-or-stairs"],
+        createdBy: "system",
+        createdAt: new Date().toISOString(),
+      });
+      existingMapEntityIds.add(id);
+    }
+  }
 
   const app = express();
   app.use(express.json());
@@ -311,22 +344,9 @@ export async function createServer(options = {}) {
 
     const floor = Number(req.query.floor ?? 1);
     const normalizedName = `Floor ${Number.isFinite(floor) && floor > 0 ? floor : 1}: ${constructName}`;
-    const id = `entity_map_${sha256(normalizedName).slice(0, 24)}`;
-    let entity = await store.getEntity(id);
-    if (!entity) {
-      entity = {
-        id,
-        type: "map_location",
-        title: normalizedName,
-        body: `Collaborative thread for ${normalizedName}`,
-        parentEntityId: null,
-        references: [],
-        tags: ["map", "room-or-stairs"],
-        createdBy: "system",
-        createdAt: new Date().toISOString(),
-      };
-      await store.createEntity(entity);
-    }
+    const id = mapEntityIdFor(normalizedName);
+    const entity = await store.getEntity(id);
+    if (!entity) return res.status(404).json({ error: "map entity not found" });
 
     const comments = await store.listEntities({ type: "comment", parentEntityId: id });
     const referencing = await store.listReferencingEntities([id]);
