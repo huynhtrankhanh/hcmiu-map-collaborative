@@ -17,6 +17,8 @@ const mapPointToConstructNamePath = path.resolve(__dirname, "../src/mapPointToCo
 const liftPositionsPath = path.resolve(__dirname, "../src/liftPositions.ts");
 const API_PATH_PREFIX = "/api";
 const WS_PATH_PREFIX = "/ws";
+const MAP_ENTITY_HASH_LENGTH = 24;
+const MAP_FLOOR_COUNT = 7;
 
 class ArangoStore {
   constructor(url, databaseName, username, password) {
@@ -176,12 +178,15 @@ class ArangoStore {
 }
 
 const toEntityId = (prefix) => `${prefix}_${uuidv4().replace(/-/g, "")}`;
-const mapEntityIdFor = (normalizedName) => `entity_map_${sha256(normalizedName).slice(0, 24)}`;
+const mapEntityIdFor = (normalizedName) =>
+  `entity_map_${sha256(normalizedName).slice(0, MAP_ENTITY_HASH_LENGTH)}`;
 const extractQuotedMatches = (source, regex) => [...source.matchAll(regex)].map((match) => match[1]);
 const loadMapConstructNames = () => {
   const mapSource = fs.readFileSync(mapPointToConstructNamePath, "utf8");
   const liftSource = fs.readFileSync(liftPositionsPath, "utf8");
+  // mapPointToConstructName.ts shape: { "123": "ROOM_NAME" }
   const roomNames = extractQuotedMatches(mapSource, /"\d+":\s*"([^"]+)"/g);
+  // liftPositions.ts shape: { "LIFT NAME": 123 }
   const liftNames = extractQuotedMatches(liftSource, /"([^"]+)":\s*\d+/g);
   return [...new Set([...roomNames, ...liftNames])];
 };
@@ -212,7 +217,7 @@ export async function createServer(options = {}) {
   const mapConstructNames = loadMapConstructNames();
   const existingMapEntities = await store.listEntities({ type: "map_location" });
   const existingMapEntityIds = new Set(existingMapEntities.map((entity) => entity.id));
-  for (let floor = 1; floor <= 7; floor++) {
+  for (let floor = 1; floor <= MAP_FLOOR_COUNT; floor++) {
     for (const constructName of mapConstructNames) {
       const normalizedName = `Floor ${floor}: ${constructName}`;
       const id = mapEntityIdFor(normalizedName);
