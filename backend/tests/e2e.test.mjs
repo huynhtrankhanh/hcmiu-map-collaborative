@@ -7,7 +7,7 @@ import sodium from "libsodium-wrappers-sumo";
 
 const root = "/home/runner/work/hcmiu-map-collaborative/hcmiu-map-collaborative";
 const backendUrl = "http://localhost:3000";
-const frontendUrl = "http://localhost:5173";
+const frontendUrl = backendUrl;
 const screenshotDir = path.join(root, "artifacts", "screenshots");
 
 const runCommand = (args) => {
