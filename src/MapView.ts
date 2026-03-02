@@ -31,10 +31,20 @@ export const MapView = (
 ) => {
   let currentFloor: number = 0;
   let currentScale = 100;
+  let floorSelector: HTMLSelectElement | null = null;
 
   const mapElement = h("div.relative", {
     style: "width:953.31px;height:452px",
   });
+
+  const syncFloorSelector = () => {
+    if (floorSelector) floorSelector.value = String(currentFloor);
+  };
+  const setFloorIndex = (floorIndex: number) => {
+    currentFloor = Math.max(0, Math.min(floors.length - 1, floorIndex));
+    syncFloorSelector();
+    renderCurrentFloor();
+  };
 
   const renderCurrentFloor = () => {
     mapElement.innerHTML = "";
@@ -74,10 +84,7 @@ export const MapView = (
       });
       mapElement.querySelectorAll("[data-isstairs]").forEach((stairs: Element) => {
         stairs.addEventListener("click", () => {
-          config.onChoose({
-            constructName: "STAIRS",
-            floor: currentFloor + 1,
-          });
+          config.onChoose({ constructName: "STAIRS", floor: currentFloor + 1 });
         });
         (stairs as HTMLDivElement).style.cursor = "pointer";
       });
@@ -93,8 +100,7 @@ export const MapView = (
 
   const focusConstruct = (floorIndex: number, constructName: string) => {
     if (Number.isFinite(floorIndex)) {
-      currentFloor = Math.max(0, Math.min(floors.length - 1, floorIndex));
-      renderCurrentFloor();
+      setFloorIndex(floorIndex);
     }
     const target = mapElement.querySelector(`[data-constructname="${constructName}"]`);
     if (target) {
@@ -114,8 +120,7 @@ export const MapView = (
     const legs = config.legs;
 
     config.changeLegHook((leg) => {
-      currentFloor = legs[leg].floor;
-      renderCurrentFloor();
+      setFloorIndex(legs[leg].floor);
 
       const path = legs[leg].path;
 
@@ -162,8 +167,7 @@ export const MapView = (
       applyScale();
     },
     setFloor: (floorIndex: number) => {
-      currentFloor = Math.max(0, Math.min(floors.length - 1, floorIndex));
-      renderCurrentFloor();
+      setFloorIndex(floorIndex);
     },
   });
 
@@ -176,8 +180,7 @@ export const MapView = (
         {
           name: "floor",
           onchange: (event: Event) => {
-            currentFloor = Number((event.target as HTMLSelectElement).value);
-            renderCurrentFloor();
+            setFloorIndex(Number((event.target as HTMLSelectElement).value));
           },
           style:
             config?.type === "display path" ? "display:none" : "display:block",
@@ -207,6 +210,8 @@ export const MapView = (
     ),
     h("div.overflow-auto", mapElement)
   );
+  floorSelector = element.querySelector("select[name='floor']") as HTMLSelectElement | null;
+  syncFloorSelector();
 
   return { element };
 };
