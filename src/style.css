@@ -5,14 +5,17 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #000000;
-  color: #ffffff;
+  background: radial-gradient(circle at 20% 20%, #14213d, #0b1220 45%, #090f1d 75%);
+  color: #e2e8f0;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 #app {
   min-height: 100vh;
   position: relative;
   overflow: hidden;
+  background: radial-gradient(circle at 80% 10%, rgba(37, 99, 235, 0.15), transparent 35%),
+    radial-gradient(circle at 10% 90%, rgba(56, 189, 248, 0.15), transparent 30%);
 }
 
 #app::before,
@@ -21,47 +24,42 @@ body {
 }
 
 .min-h-screen {
-  padding: 2rem 1rem;
+  padding: 2.5rem 1.5rem;
   background: transparent;
 }
 
 .bg-white {
-  background: #000000;
-  border: 3px solid #ffffff;
-  border-radius: 0;
-  box-shadow: none;
-  backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
   position: relative;
-}
-
-.bg-white::before {
-  display: none;
 }
 
 .bg-gray-50,
 .bg-gray-100,
 .bg-gray-200 {
-  background: #000000;
-  border: 2px solid #ffffff;
-  border-radius: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
 }
 
 .text-gray-900,
+.text-gray-800,
 .text-gray-700,
 .text-gray-600,
 .text-gray-500,
-.text-gray-800,
-.text-slate-300,
 .text-gray-400,
 .text-blue-700,
 .text-blue-800,
 .text-green-700,
 .text-green-800,
-.text-amber-800 {
-  color: #ffffff;
+.text-amber-800,
+.text-slate-300 {
+  color: #e2e8f0;
 }
 
-/* Button-style colored backgrounds: black with white border */
 .bg-blue-500,
 .bg-red-500,
 .bg-red-700,
@@ -73,60 +71,59 @@ body {
 .bg-slate-700,
 .bg-yellow-600,
 .bg-amber-600 {
-  background: #000000;
-  border: 3px solid #ffffff;
-  box-shadow: none;
-  border-radius: 0;
-  color: #ffffff;
+  background: linear-gradient(120deg, #2563eb, #22d3ee);
+  border: none;
+  border-radius: 12px;
+  color: #0b1220;
+  box-shadow: 0 10px 30px rgba(34, 211, 238, 0.25);
 }
 
-/* Active/primary state: inverted colors to distinguish from normal black buttons */
 .bg-blue-600 {
-  background: #ffffff;
-  border: 2px solid #000000;
-  border-radius: 0;
-  color: #000000;
+  background: linear-gradient(120deg, #1d4ed8, #3b82f6);
+  border: none;
+  border-radius: 12px;
+  color: #e2e8f0;
 }
 
-/* Badge-style colored backgrounds: black with white border */
 .bg-blue-100,
 .bg-green-50,
 .bg-green-100,
 .bg-amber-100 {
-  background: #000000;
-  color: #ffffff;
-  border: 1px solid #ffffff;
-  border-radius: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
 }
 
 button {
-  background: #000000;
-  color: #ffffff;
-  border: 2px solid #ffffff;
-  border-radius: 0;
+  background: linear-gradient(120deg, #2563eb, #22d3ee);
+  color: #e7f6ff;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.3);
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
 }
 
 button:hover {
-  transform: none;
-  filter: none;
-  background: #ffffff;
-  color: #000000;
+  transform: translateY(-1px);
+  filter: saturate(1.05);
+  box-shadow: 0 14px 36px rgba(34, 211, 238, 0.35);
+  color: #0b1220;
 }
 
 input,
 select,
 textarea {
-  background: #000000;
-  color: #ffffff;
-  border: 2px solid #ffffff;
-  border-radius: 0;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-/* Use class-level selector to beat .placeholder-gray-400::placeholder specificity */
 input::placeholder,
 .placeholder-gray-400::placeholder {
-  color: #ffffff;
-  opacity: 1;
+  color: rgba(226, 232, 240, 0.85);
 }
 
 .border,
@@ -134,13 +131,13 @@ input::placeholder,
 .border-b,
 .border-l,
 .border-r {
-  border-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .border-gray-300,
 .border-slate-400\/30,
 .divide-gray-200 > * + * {
-  border-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .rounded,
@@ -148,55 +145,33 @@ input::placeholder,
 .rounded-lg,
 .rounded-xl,
 .rounded-full {
-  border-radius: 0;
+  border-radius: 12px;
 }
 
 .shadow-md,
 .shadow-lg,
 .shadow-sm {
-  box-shadow: none;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
 }
 
-/* Range slider track: white */
 .bg-\[\#D1D5DB\] {
-  background: #ffffff;
+  background: #e2e8f0;
 }
 
-/* Map corridor areas: white background for contrast against black non-building areas */
 .bg-yellow-200 {
-  background: #ffffff;
+  background: #f8fafc;
 }
 
-/* Inside map corridors: text and borders must be black for visibility on white.
-   Using body .bg-yellow-200 * (specificity 0,1,1) to beat .border (0,1,0). */
 body .bg-yellow-200,
 body .bg-yellow-200 * {
-  color: #000000;
-  border-color: #000000;
-}
-
-/* Prevent intermediate visual shades from opacity utilities */
-.opacity-50,
-.opacity-80,
-.opacity-90 {
-  opacity: 1;
-}
-
-.text-red-500 {
-  color: #ffffff;
-  font-weight: bold;
-  text-decoration: underline;
-}
-
-.text-green-500 {
-  color: #ffffff;
-  font-style: italic;
+  color: #0f172a;
+  border-color: #0f172a;
 }
 
 .hover\:bg-gray-100:hover,
 .hover\:bg-blue-50:hover {
-  background: #ffffff;
-  color: #000000;
+  background: rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
 }
 
 .focus\:bg-white:focus {
