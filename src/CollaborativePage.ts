@@ -411,14 +411,23 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         break;
       }
       case "trials": {
+        const userLabel = (userId: string) => {
+          const userEntity = entities.find((e) => e.type === "user" && e.createdBy === userId);
+          return userEntity?.title || userId;
+        };
+        const renderJudgeList = (ids: string[] = []) => ids.map((j: string) => escapeHtml(userLabel(j))).join(", ");
+
         const trialMarkup = trials
           .map((trial) => {
+            const trialEntity = entities.find((e) => e.id === trial.entityId);
             const historyHtml = (trial.judgeNegotiationHistory || []).map((entry: any) => {
-              if (entry.acceptedBy) return `<div class="text-xs text-green-700">✅ Accepted by ${escapeHtml(entry.acceptedBy)} at ${escapeHtml(entry.timestamp)}</div>`;
-              return `<div class="text-xs text-blue-700">📋 Proposed by ${escapeHtml(entry.proposedBy)} at ${escapeHtml(entry.timestamp)}: ${(entry.judges || []).map((j: string) => escapeHtml(j)).join(", ")}</div>`;
+              if (entry.acceptedBy) {
+                return `<div class="text-xs text-green-700">✅ Accepted by ${escapeHtml(userLabel(entry.acceptedBy))} at ${escapeHtml(entry.timestamp)}</div>`;
+              }
+              return `<div class="text-xs text-blue-700">📋 Proposed by ${escapeHtml(userLabel(entry.proposedBy))} at ${escapeHtml(entry.timestamp)}: ${(entry.judges || []).map((j: string) => escapeHtml(userLabel(j))).join(", ")}</div>`;
             }).join("");
             const lastProposalInfo = trial.lastProposedBy
-              ? `<div class="text-xs text-orange-600 mt-1">Last proposal by: ${escapeHtml(trial.lastProposedBy)} — Judges: ${(trial.lastProposedJudges || []).map((j: string) => escapeHtml(j)).join(", ")}</div>`
+              ? `<div class="text-xs text-orange-600 mt-1">Last proposal by: ${escapeHtml(userLabel(trial.lastProposedBy))} — Judges: ${renderJudgeList(trial.lastProposedJudges)}</div>`
               : "";
             const canAccept = (() => {
               if (!token || trial.status !== "pending_agreement") return false;
@@ -435,9 +444,11 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             const canVote = token && trial.status === "active" && trial.agreedJudges?.includes(me?.id);
             return `
               <div class="border rounded p-3 mb-3">
-                <div class="font-semibold">Trial ${escapeHtml(trial.id)}</div>
-                <div class="text-sm">status: ${escapeHtml(trial.status)}${trial.outcome ? `, outcome: ${escapeHtml(trial.outcome)}` : ""}</div>
-                <div class="text-xs">agreed judges: ${(trial.agreedJudges || []).map((j: string) => escapeHtml(j)).join(", ") || "none"}</div>
+                <div class="font-semibold">${escapeHtml(trialEntity?.title || `Trial ${trial.id}`)}</div>
+                ${trialEntity?.body ? `<div class="text-sm text-gray-700">${escapeHtml(trialEntity.body)}</div>` : ""}
+                <div class="text-xs mt-1">plaintiff: ${escapeHtml(userLabel(trial.plaintiffUserId))}, defendant: ${escapeHtml(userLabel(trial.defendantUserId))}</div>
+                <div class="text-sm mt-1">status: ${escapeHtml(trial.status)}${trial.outcome ? `, outcome: ${escapeHtml(trial.outcome)}` : ""}</div>
+                <div class="text-xs">agreed judges: ${renderJudgeList(trial.agreedJudges) || "none"}</div>
                 ${lastProposalInfo}
                 ${historyHtml ? `<details class="mt-1"><summary class="text-xs cursor-pointer text-gray-500">Negotiation history</summary><div class="mt-1">${historyHtml}</div></details>` : ""}
                 ${canAccept ? `<button data-accept-judges="${escapeHtml(trial.id)}" class="bg-green-600 text-white px-2 py-1 rounded mt-2">Accept Judges</button>` : ""}

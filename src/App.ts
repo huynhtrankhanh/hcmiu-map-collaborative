@@ -235,8 +235,7 @@ const MapViewPage = (
             : h("p.text-sm.text-gray-600", "Click a room or stairs to view discussion thread.")
     );
 
-    const toolbar = h(
-      "div.flex.flex-wrap.gap-2.mt-2",
+    const toolbar = h("div.flex.flex-wrap.gap-2.mt-2",
       h(
         "button.bg-red-500.text-white.px-4.py-2.rounded",
         {
@@ -245,24 +244,6 @@ const MapViewPage = (
           },
         },
         "Exit"
-      ),
-      h(
-        "button.bg-blue-500.text-white.px-4.py-2.rounded",
-        {
-          onclick: () => {
-            mapViewApi?.setScale?.(130);
-          },
-        },
-        "Zoom 130%"
-      ),
-      h(
-        "button.bg-blue-500.text-white.px-4.py-2.rounded",
-        {
-          onclick: () => {
-            mapViewApi?.setFloor?.(0);
-          },
-        },
-        "Jump to Floor 1"
       )
     );
 

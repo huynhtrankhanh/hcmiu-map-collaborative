@@ -136,6 +136,17 @@ const run = async () => {
     // Map -> Collaborative deep integration
     await clickButtonByText(page, "View Map");
     await page.waitForFunction(() => document.body.textContent?.includes("Map Collaboration"));
+    await page.waitForSelector("select[name='floor']");
+    await page.type("#map-quick-search", "Floor 2: A2.203");
+    await page.waitForFunction(() => Array.from(document.querySelectorAll("div")).some((el) => (el.textContent || "").includes("Floor 2: A2.203")));
+    await page.evaluate(() => {
+      const suggestion = Array.from(document.querySelectorAll("div")).find((el) => (el.textContent || "").includes("Floor 2: A2.203"));
+      if (!suggestion || !(suggestion instanceof HTMLElement)) throw new Error("map quick search suggestion missing");
+      suggestion.click();
+    });
+    await page.waitForFunction(() => document.querySelector("select[name='floor']")?.value === "1");
+    await page.select("select[name='floor']", "0");
+    await page.waitForFunction(() => document.querySelector("select[name='floor']")?.value === "0");
     await page.screenshot({ path: path.join(screenshotDir, "map-view-page.png"), fullPage: true });
     await page.evaluate(() => {
       const room = Array.from(document.querySelectorAll("[data-constructname]")).find((x) =>
@@ -231,6 +242,8 @@ const run = async () => {
     // Navigate to Trials page and take screenshot
     await clickButtonByText(page, "⚖️ Trials");
     await page.waitForFunction(() => document.body.textContent?.includes("Court of Justice"));
+    await page.waitForFunction((title) => document.body.textContent?.includes(title), {}, "E2E Trial");
+    await page.waitForFunction((user) => document.body.textContent?.includes(user), {}, defendantUser);
     await page.screenshot({ path: path.join(screenshotDir, "collaborative-trials-page.png"), fullPage: true });
 
     // Navigate to Activity Feed and take screenshot
