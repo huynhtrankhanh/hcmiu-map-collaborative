@@ -87,6 +87,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
     | { type: "degree"; data: { path: string[]; entities: any[] } }
     | { type: "error"; data: string };
   let researchResult: ResearchResult | null = null;
+  let researchTab: "references" | "fulltext" | "degree" = "references";
   let currentSubPage: "hub" | "auth" | "entities" | "trials" | "research" | "notifications" | "activity" | "tutorial" = options?.focusedEntityId ? "entities" : "hub";
 
   const refresh = async () => {
@@ -542,7 +543,12 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       case "research": {
         contentHtml = `
           <h2 class="text-xl font-semibold mb-3">🔎 Deep Research</h2>
-          <section class="border rounded p-3 mb-3">
+          <div class="flex flex-wrap gap-2 mb-3">
+            <button data-research-tab="references" class="px-3 py-2 rounded border ${researchTab === "references" ? "bg-slate-700 text-white" : "bg-white"}">Referencing Entities</button>
+            <button data-research-tab="fulltext" class="px-3 py-2 rounded border ${researchTab === "fulltext" ? "bg-slate-700 text-white" : "bg-white"}">Full-text Search</button>
+            <button data-research-tab="degree" class="px-3 py-2 rounded border ${researchTab === "degree" ? "bg-slate-700 text-white" : "bg-white"}">Degree of Separation</button>
+          </div>
+          <section class="border rounded p-3 mb-3" style="${researchTab === "references" ? "" : "display:none"}">
             <h3 class="font-semibold mb-2">Find Referencing Entities</h3>
             <label class="text-sm">Three methods: search, map, manual.</label>
             <label class="text-xs text-gray-600">Method 1 — Search</label>
@@ -558,12 +564,12 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             </details>
             <button id="research-by-refs" class="bg-slate-700 text-white px-3 py-2 rounded mt-2">Find Referencing Entities</button>
           </section>
-          <section class="border rounded p-3 mb-3">
+          <section class="border rounded p-3 mb-3" style="${researchTab === "fulltext" ? "" : "display:none"}">
             <h3 class="font-semibold mb-2">Full-text Search</h3>
             <input id="research-fulltext" class="border p-2 w-full mb-2" placeholder="Full-text query" />
             <button id="research-fulltext-btn" class="bg-slate-700 text-white px-3 py-2 rounded">Full-text Search</button>
           </section>
-          <section class="border rounded p-3 mb-3">
+          <section class="border rounded p-3 mb-3" style="${researchTab === "degree" ? "" : "display:none"}">
             <h3 class="font-semibold mb-2">Degree of Separation</h3>
             <div class="mb-2">
               <label class="text-sm">From entity (three methods: search, map, manual):</label>
@@ -951,6 +957,13 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       const refResearchWidget = buildEntitySearchWidget(panel, "research-entity-search", "research-refs-selected");
       const degreeFromWidget = buildSingleEntityPicker(panel, "degree-from-search");
       const degreeToWidget = buildSingleEntityPicker(panel, "degree-to-search");
+
+      panel.querySelectorAll("[data-research-tab]").forEach((button: Element) => {
+        button.addEventListener("click", () => {
+          researchTab = ((button as HTMLElement).dataset.researchTab as any) ?? "references";
+          render();
+        });
+      });
 
       byId("research-by-refs")?.addEventListener("click", async () => {
         const ids = refResearchWidget.getSelectedIds();
