@@ -33,7 +33,6 @@ const MapViewPage = (
   let mapEntity: any = null;
   let comments: any[] = [];
   let referencingCount = 0;
-  let shareStatus = "";
 
   const loadMapThread = async () => {
     if (!selectedConstruct) return;
@@ -58,7 +57,6 @@ const MapViewPage = (
       type: "browse",
       onChoose: async (payload) => {
         selectedConstruct = payload;
-        shareStatus = "";
         await loadMapThread();
         render();
       },
@@ -69,107 +67,52 @@ const MapViewPage = (
       : "Select a room/stairs on the map";
 
     const element = h(
-        "div.flex.flex-col.items-center.justify-center.min-h-screen",
-        { style: "background:#000000" },
+      "div.flex.flex-col.items-center.justify-center.min-h-screen",
+      { style: "background:#000000" },
+      h(
+        "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
+        { style: "max-width:72rem" },
+        PageIntro("🗺️", "Campus Explorer", "Browse the map and jump directly into collaborative discussions."),
         h(
-          "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
-          { style: "max-width:72rem" },
-          PageIntro("🗺️", "Campus Explorer", "Browse the map and jump directly into collaborative discussions."),
-          h(
-            "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
-            {
-              onclick: () => {
-                if (onExit !== undefined) onExit();
-              },
+          "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
+          {
+            onclick: () => {
+              if (onExit !== undefined) onExit();
             },
-            "Exit"
-          ),
+          },
+          "Exit"
+        ),
+        h(
+          "div.grid.md:grid-cols-3.gap-4",
+          h("div.md:col-span-2", mapView.element),
           h(
-            "div.grid.md:grid-cols-3.gap-3.mb-3",
-            h(
-              "div.border.rounded.p-3.bg-gray-50",
-              h("p.text-xs.uppercase.tracking-wide.opacity-80", "How to explore"),
-              h("p.text-sm.mt-1", "Click any room, stairs, or lift on the current floor. Use the zoom slider for close inspection.")
-            ),
-            h(
-              "div.border.rounded.p-3.bg-gray-50",
-              h("p.text-xs.uppercase.tracking-wide.opacity-80", "Thread hand-off"),
-              h("p.text-sm.mt-1", "Open a selected room in HCMIU Collaborative to create entities, comments, or trials tied to that location.")
-            ),
-            h(
-              "div.border.rounded.p-3.bg-gray-50",
-              h("p.text-xs.uppercase.tracking-wide.opacity-80", "Shareable focus"),
-              h("p.text-sm.mt-1", "Copy a ready-to-share focus link so teammates can land on the same room context quickly.")
-            )
-          ),
-          h(
-            "div.grid.md:grid-cols-3.gap-4",
-            h("div.md:col-span-2", mapView.element),
-            h(
-              "div.border.rounded.p-3.bg-gray-50",
-              h("h2.text-lg.font-semibold.mb-2", "🤝 Map Collaboration"),
-              h("p.text-sm.mb-2", selectedTitle),
-              mapEntity
-                ? h(
-                    "div",
-                    h("p.text-xs.mb-2", `Entity ID: ${mapEntity.id}`),
-                    h(
-                      "div.flex.flex-wrap.gap-2.mb-2",
-                      h(
-                        "span.bg-blue-100.text-blue-800.text-xs.px-2.py-1.rounded-full",
-                        `${comments.length} comment${comments.length === 1 ? "" : "s"}`
-                      ),
-                      h(
-                        "span.bg-blue-100.text-blue-800.text-xs.px-2.py-1.rounded-full",
-                        `${referencingCount} reference${referencingCount === 1 ? "" : "s"}`
-                      ),
-                      h(
-                        "span.bg-blue-100.text-blue-800.text-xs.px-2.py-1.rounded-full",
-                        `Floor ${selectedConstruct?.floor ?? "?"}`
-                      )
-                    ),
-                    h("p.text-xs.mb-2", `Entities referencing this location: ${referencingCount}`),
-                    h("h3.font-semibold.mb-2", "Comments"),
-                    h("ul.text-sm.list-disc.pl-5.max-h-56.overflow-auto", commentNodes),
-                    h(
-                      "div.flex.flex-col.gap-2.mt-3",
-                      h(
-                        "button.bg-green-600.text-white.px-3.py-2.rounded.w-full",
-                        {
-                          onclick: () => {
-                            if (onOpenCollaborative && mapEntity) {
-                              onOpenCollaborative({
-                                entityId: mapEntity.id,
-                                label: selectedTitle,
-                              });
-                            }
-                          },
-                        },
-                        "Open in HCMIU Collaborative"
-                      ),
-                      h(
-                        "button.bg-blue-500.text-white.px-3.py-2.rounded.w-full",
-                        {
-                          onclick: async () => {
-                            if (!mapEntity || !selectedConstruct) return;
-                            const shareLink = `${window.location.origin}?focus=${mapEntity.id}`;
-                            const shareText = `${selectedConstruct.constructName} (Floor ${selectedConstruct.floor}) — ${shareLink}`;
-                            try {
-                              await navigator.clipboard?.writeText(shareText);
-                              shareStatus = "Copied a shareable focus link for this room.";
-                            } catch {
-                              shareStatus = "Copy failed. Copy the entity id instead.";
-                            }
-                            render();
-                          },
-                        },
-                        "Copy shareable focus link"
-                      ),
-                      shareStatus ? h("p.text-xs.text-green-500", shareStatus) : null
-                    )
+            "div.border.rounded.p-3.bg-gray-50",
+            h("h2.text-lg.font-semibold.mb-2", "🤝 Map Collaboration"),
+            h("p.text-sm.mb-2", selectedTitle),
+            mapEntity
+              ? h(
+                  "div",
+                  h("p.text-xs.mb-2", `Entity ID: ${mapEntity.id}`),
+                  h("p.text-xs.mb-2", `Entities referencing this location: ${referencingCount}`),
+                  h("h3.font-semibold.mb-2", "Comments"),
+                  h("ul.text-sm.list-disc.pl-5.max-h-56.overflow-auto", commentNodes),
+                  h(
+                    "button.bg-green-600.text-white.px-3.py-2.rounded.w-full.mt-3",
+                    {
+                      onclick: () => {
+                        if (onOpenCollaborative && mapEntity) {
+                          onOpenCollaborative({
+                            entityId: mapEntity.id,
+                            label: selectedTitle,
+                          });
+                        }
+                      },
+                    },
+                    "Open in HCMIU Collaborative"
                   )
-                : h("p.text-sm.text-gray-600", "Click a room or stairs to view discussion thread.")
-            )
+                )
+              : h("p.text-sm.text-gray-600", "Click a room or stairs to view discussion thread.")
+          )
         )
       )
     );
@@ -749,28 +692,6 @@ const LandingPage = (
       h(
         "div.bg-white.p-5.w-full",
         h("p.text-sm", "Tip: Start with ", h("span.font-semibold", "View Map"), " to inspect entities, then continue in ", h("span.font-semibold", "HCMIU Collaborative"), ".")
-      ),
-      h(
-        "div.bg-white.p-5.w-full",
-        h("h3.text-lg.font-semibold.mb-2", "Ops-ready checks"),
-        h(
-          "div.grid.md:grid-cols-3.gap-3",
-          h(
-            "div.border.rounded-xl.p-3",
-            h("p.text-xs.uppercase.tracking-wide.opacity-80", "Docker Compose"),
-            h("p.text-sm.mt-1", "Run `docker compose up --build` to bring the API + map bundle online on port 3000.")
-          ),
-          h(
-            "div.border.rounded-xl.p-3",
-            h("p.text-xs.uppercase.tracking-wide.opacity-80", "Headless friendly"),
-            h("p.text-sm.mt-1", "The UI stays keyboard navigable with large tap targets for automated trials.")
-          ),
-          h(
-            "div.border.rounded-xl.p-3",
-            h("p.text-xs.uppercase.tracking-wide.opacity-80", "Collaboration"),
-            h("p.text-sm.mt-1", "Map selections hand off directly to the collaborative workspace for threading.")
-          )
-        )
       )
     )
   );
@@ -786,55 +707,6 @@ export const App = () => {
     | "traveling salesman"
     | "collaborative" = "landing";
   const element = h("div");
-  const navItems = [
-    { key: "landing", label: "Overview", icon: "📌", description: "Pick a workflow" },
-    { key: "map view", label: "Map", icon: "🗺️", description: "Browse + discuss" },
-    { key: "shortest path", label: "Route", icon: "🧭", description: "Point-to-point" },
-    { key: "traveling salesman", label: "Multi-stop", icon: "📍", description: "Optimize list" },
-    { key: "collaborative", label: "Collaborative", icon: "🤝", description: "Threads + trials" },
-  ] as const;
-  const renderChrome = (pageTitle: string, subtitle: string, content: Element) => {
-    const navButtons = navItems.map((item) =>
-      h(
-        `button.${currentPage === item.key ? "bg-blue-600" : "bg-blue-500"}.text-white.px-3.py-2.rounded`,
-        {
-          onclick: () => {
-            currentPage = item.key;
-            content.innerHTML = "";
-            transition();
-          },
-        },
-        h("div.flex.items-center.gap-2", h("span", item.icon), h("span.font-semibold", item.label)),
-        h("div.text-[11px].opacity-80.mt-0.5", item.description)
-      )
-    );
-
-    const focusBadge =
-      collaborativeFocus !== null
-        ? h(
-            "div.inline-flex.items-center.gap-2.bg-white/20.border.border-white/30.rounded-full.px-3.py-1.text-xs.mt-2",
-            h("span", "🎯 Focus"),
-            h("span.font-semibold", collaborativeFocus.label),
-            h("code.text-[11px].opacity-80", collaborativeFocus.entityId)
-          )
-        : null;
-
-    return h(
-      "div.space-y-5.px-4.md:px-8.pb-8",
-      h(
-        "div.sticky.top-0.z-30.backdrop-blur-md.bg-white/10.border.border-white/15.rounded-2xl.shadow-2xl.p-4.flex.flex-wrap.items-start.gap-3",
-        h(
-          "div.flex-1.min-w-[240px]",
-          h("p.text-xs.tracking-widest.uppercase.opacity-80", "Workspace"),
-          h("h2.text-xl.font-semibold", pageTitle),
-          h("p.text-sm.opacity-80", subtitle),
-          focusBadge
-        ),
-        h("div.flex.flex-wrap.gap-2.justify-end.flex-1", ...navButtons)
-      ),
-      content
-    );
-  };
   const transition = (): null => {
     const exit = () => {
       currentPage = "landing";
@@ -844,52 +716,53 @@ export const App = () => {
     element.innerHTML = "";
     switch (currentPage) {
       case "landing": {
-        const landing = LandingPage(
-          () => {
-            currentPage = "map view";
-            transition();
-          },
-          () => {
-            currentPage = "shortest path";
-            transition();
-          },
-          () => {
-            currentPage = "traveling salesman";
-            transition();
-          },
-          () => {
-            currentPage = "collaborative";
-            transition();
-          }
+        element.appendChild(
+          LandingPage(
+            () => {
+              currentPage = "map view";
+              transition();
+            },
+            () => {
+              currentPage = "shortest path";
+              transition();
+            },
+            () => {
+              currentPage = "traveling salesman";
+              transition();
+            },
+            () => {
+              currentPage = "collaborative";
+              transition();
+            }
+          ).element
         );
-        element.appendChild(renderChrome("Workspace Hub", "Choose how you want to explore or collaborate today.", landing.element));
         return null;
       }
       case "map view": {
-        const map = MapViewPage(exit, (payload) => {
-          collaborativeFocus = payload;
-          currentPage = "collaborative";
-          transition();
-        });
-        element.appendChild(renderChrome("Map Collaboration", "Browse the campus map, then hand off threads to the collaborative workspace.", map.element));
+        element.appendChild(
+          MapViewPage(exit, (payload) => {
+            collaborativeFocus = payload;
+            currentPage = "collaborative";
+            transition();
+          }).element
+        );
         return null;
       }
       case "shortest path": {
-        const shortest = ShortestPathPage(exit);
-        element.appendChild(renderChrome("Shortest Path", "Quickly get from A to B, across floors.", shortest.element));
+        element.appendChild(ShortestPathPage(exit).element);
         return null;
       }
       case "traveling salesman": {
-        const salesman = TravelingSalesmanPage(exit);
-        element.appendChild(renderChrome("Multi-stop Planner", "Order a list of errands into an efficient path.", salesman.element));
+        element.appendChild(TravelingSalesmanPage(exit).element);
         return null;
       }
       case "collaborative": {
-        const collaborative = CollaborativePage(exit, {
-          focusedEntityId: collaborativeFocus?.entityId,
-          focusedEntityLabel: collaborativeFocus?.label,
-        });
-        element.appendChild(renderChrome("Collaborative Hub", "Threads, trials, notifications, and research in one place.", collaborative.element));
+        element.appendChild(
+          CollaborativePage(exit, {
+            focusedEntityId: collaborativeFocus?.entityId,
+            focusedEntityLabel: collaborativeFocus?.label,
+          }).element
+        );
         return null;
       }
     }
