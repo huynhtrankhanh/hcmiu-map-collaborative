@@ -82,7 +82,11 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
   let notifications: any[] = [];
   let activityItems: any[] = [];
   let ws: WebSocket | null = null;
-  let searchOutput = "";
+  type ResearchResult =
+    | { type: "references" | "fulltext"; data: { entities: any[] } }
+    | { type: "degree"; data: { path: string[]; entities: any[] } }
+    | { type: "error"; data: string };
+  let researchResult: ResearchResult | null = null;
   let currentSubPage: "hub" | "auth" | "entities" | "trials" | "research" | "notifications" | "activity" | "tutorial" = options?.focusedEntityId ? "entities" : "hub";
 
   const refresh = async () => {
@@ -118,6 +122,63 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
     if (entity.createdBy === trial.defendantUserId) return "[defendant]";
     if (trial.agreedJudges?.includes(entity.createdBy)) return "[judge]";
     return "[spectator]";
+  };
+
+  const renderEntityCard = (entity: any) => {
+    const body = typeof entity.body === "string" ? entity.body : "";
+    const snippet = body.length > 160 ? `${body.slice(0, 157)}...` : body;
+    return `
+      <div class="border rounded p-3 bg-white shadow-sm">
+        <div class="text-[11px] uppercase text-gray-500 tracking-wide mb-1">${escapeHtml(entity.type ?? "entity")}</div>
+        <div class="text-sm font-semibold">${escapeHtml(entity.title || "(untitled)")}</div>
+        <div class="text-[11px] text-gray-500 break-all">${escapeHtml(entity.id)}</div>
+        ${snippet ? `<div class="text-xs text-gray-700 mt-1 leading-relaxed">${escapeHtml(snippet)}</div>` : ""}
+        <div class="text-[11px] text-gray-500 mt-2 flex gap-3 flex-wrap">
+          <span>${(entity.references ?? []).length} refs</span>
+          ${entity.createdAt ? `<span>Created ${escapeHtml(String(entity.createdAt).slice(0, 10))}</span>` : ""}
+        </div>
+      </div>
+    `;
+  };
+
+  const renderResearchResult = () => {
+    if (!researchResult) return `<div class="text-sm text-gray-600">Run a query to see results.</div>`;
+    if (researchResult.type === "error") {
+      return `<div class="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">${escapeHtml(researchResult.data)}</div>`;
+    }
+    if (researchResult.type === "degree") {
+      const path = researchResult.data?.path ?? [];
+      const entitiesById = new Map((researchResult.data?.entities ?? []).map((entity: any) => [entity.id, entity]));
+      if (!path.length) return `<div class="text-sm text-gray-600">No path found.</div>`;
+      const hopCount = Math.max(path.length - 1, 0);
+      const steps = path
+        .map((id: string, index: number) => {
+          const entity = entitiesById.get(id) ?? { id, title: "Unknown entity", type: "entity" };
+          return `
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-slate-700 text-white text-xs flex items-center justify-center mt-1">${index + 1}</div>
+              <div class="flex-1">${renderEntityCard(entity)}</div>
+            </div>
+          `;
+        })
+        .join("");
+      return `
+        <div class="space-y-3">
+          <div class="text-sm text-gray-700">Shortest reference path • ${hopCount} hop${hopCount === 1 ? "" : "s"}</div>
+          <div class="space-y-2">${steps}</div>
+        </div>
+      `;
+    }
+    const entities = researchResult.data?.entities ?? [];
+    if (!entities.length) return `<div class="text-sm text-gray-600">No entities found.</div>`;
+    const heading = researchResult.type === "fulltext" ? "Full-text matches" : "Referencing entities";
+    const cards = entities.map(renderEntityCard).join("");
+    return `
+      <div class="space-y-2">
+        <div class="text-sm text-gray-700">${heading} • ${entities.length}</div>
+        <div class="grid md:grid-cols-2 gap-3">${cards}</div>
+      </div>
+    `;
   };
 
   /* ---- Entity search helper for reference input ---- */
@@ -534,7 +595,9 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             </div>
             <button id="research-degree" class="bg-slate-700 text-white px-3 py-2 rounded">Find Degree of Separation</button>
           </section>
-          <pre id="research-output" class="bg-gray-100 p-2 mt-2 overflow-auto text-xs">${escapeHtml(searchOutput || "No research query yet.")}</pre>
+          <div id="research-output" class="bg-gray-50 border rounded p-3 mt-2 overflow-auto text-sm leading-relaxed">
+            ${renderResearchResult()}
+          </div>
         `;
         break;
       }
@@ -765,7 +828,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       button.addEventListener("click", async () => {
         try {
           const result = await jsonFetch(`/api/research/references?ids=${encodeURIComponent((button as HTMLElement).dataset.researchOne!)}`);
-          searchOutput = JSON.stringify(result, null, 2);
+          researchResult = { type: "references", data: result };
           currentSubPage = "research";
           render();
         } catch (error: any) {
@@ -893,14 +956,14 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         const ids = refResearchWidget.getSelectedIds();
         if (!ids.length) { alert("Select at least one entity"); return; }
         const result = await jsonFetch(`/api/research/references?ids=${encodeURIComponent(ids.join(","))}`);
-        searchOutput = JSON.stringify(result, null, 2);
+        researchResult = { type: "references", data: result };
         render();
       });
 
       byId("research-fulltext-btn")?.addEventListener("click", async () => {
         const q = val("research-fulltext");
         const result = await jsonFetch(`/api/research/fulltext?q=${encodeURIComponent(q)}`);
-        searchOutput = JSON.stringify(result, null, 2);
+        researchResult = { type: "fulltext", data: result };
         render();
       });
 
@@ -910,9 +973,9 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
           const to = degreeToWidget.getSelectedId();
           if (!from || !to) { alert("Select both from and to entities"); return; }
           const result = await jsonFetch(`/api/research/degree?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-          searchOutput = JSON.stringify(result, null, 2);
+          researchResult = { type: "degree", data: result };
         } catch (error: any) {
-          searchOutput = error.message;
+          researchResult = { type: "error", data: error.message };
         }
         render();
       });
@@ -922,10 +985,10 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
     byId("focused-research")?.addEventListener("click", async () => {
       try {
         const result = await jsonFetch(`/api/research/references?ids=${encodeURIComponent(options?.focusedEntityId ?? "")}`);
-        searchOutput = JSON.stringify(result, null, 2);
+        researchResult = { type: "references", data: result };
         currentSubPage = "research";
       } catch (error: any) {
-        searchOutput = error.message;
+        researchResult = { type: "error", data: error.message };
       }
       render();
     });
@@ -935,7 +998,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
     .then(async () => {
       if (options?.focusedEntityId) {
         const result = await jsonFetch(`/api/research/references?ids=${encodeURIComponent(options.focusedEntityId)}`);
-        searchOutput = JSON.stringify(result, null, 2);
+        researchResult = { type: "references", data: result };
       }
     })
     .then(render);
