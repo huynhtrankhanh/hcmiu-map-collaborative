@@ -3,23 +3,34 @@ import { floors } from "./floors";
 import { createLine, labelAt } from "./superimpose";
 import { points } from "./points";
 
+type MapViewApi = {
+  focusConstruct: (floorIndex: number, constructName: string) => void;
+  resetZoom: () => void;
+  setScale: (scale: number) => void;
+  setFloor: (floorIndex: number) => void;
+};
+
 export const MapView = (
   config?:
-    | {
+    | ({
         type: "choose on map";
         onChoose: (constructName: string) => void;
-      }
-    | {
+        onReady?: (api: MapViewApi) => void;
+      })
+    | ({
         type: "browse";
         onChoose: (payload: { constructName: string; floor: number }) => void;
-      }
-    | {
+        onReady?: (api: MapViewApi) => void;
+      })
+    | ({
         type: "display path";
         legs: { floor: number; path: number[] }[];
         changeLegHook: (legChanger: (x: number) => void) => void;
-      }
+        onReady?: (api: MapViewApi) => void;
+      })
 ) => {
   let currentFloor: number = 0;
+  let currentScale = 100;
 
   const mapElement = h("div.relative", {
     style: "width:953.31px;height:452px",
@@ -75,6 +86,30 @@ export const MapView = (
 
   renderCurrentFloor();
 
+  const applyScale = () => {
+    (mapElement as HTMLDivElement).style.transform = "scale(" + currentScale / 100 + ")";
+    (mapElement as HTMLDivElement).style.transformOrigin = "top left";
+  };
+
+  const focusConstruct = (floorIndex: number, constructName: string) => {
+    if (Number.isFinite(floorIndex)) {
+      currentFloor = Math.max(0, Math.min(floors.length - 1, floorIndex));
+      renderCurrentFloor();
+    }
+    const target = mapElement.querySelector(`[data-constructname="${constructName}"]`);
+    if (target) {
+      (target as HTMLDivElement).setAttribute("data-constructselected", "");
+      (target as HTMLDivElement).style.fontWeight = "bold";
+      (target as HTMLDivElement).style.textDecoration = "underline";
+      target.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    }
+  };
+
+  const resetZoom = () => {
+    currentScale = 100;
+    applyScale();
+  };
+
   if (config?.type === "display path") {
     const legs = config.legs;
 
@@ -117,15 +152,20 @@ export const MapView = (
     });
   }
 
-  let currentScale = 100;
-
-  const applyScale = () => {
-    (mapElement as HTMLDivElement).style.transform =
-      "scale(" + currentScale / 100 + ")";
-    (mapElement as HTMLDivElement).style.transformOrigin = "top left";
-  };
-
   applyScale();
+
+  config?.onReady?.({
+    focusConstruct,
+    resetZoom,
+    setScale: (scale: number) => {
+      currentScale = scale;
+      applyScale();
+    },
+    setFloor: (floorIndex: number) => {
+      currentFloor = Math.max(0, Math.min(floors.length - 1, floorIndex));
+      renderCurrentFloor();
+    },
+  });
 
   const element = h(
     "div",

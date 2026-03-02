@@ -8,14 +8,29 @@ import { mapConstructNameToPoint } from "./mapConstructNameToPoint";
 import { mapPointToConstructName } from "./mapPointToConstructName";
 import { liftPositions, liftPositionsReverseMap } from "./liftPositions";
 import { TravelingSalesman } from "./TravelingSalesman";
-import { getFloor, stripFloor } from "./candidates";
+import { candidates, candidateSet, getFloor, stripFloor } from "./candidates";
 import { generateRandomString } from "./generateRandomString";
 import { solveTravelingSalesman } from "./solveTravelingSalesman";
 import { CollaborativePage } from "./CollaborativePage";
+import { SuggestBox } from "./SuggestBox";
 
-const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL ??
-  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+const resolveApiBase = () => {
+  const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envBase) return envBase;
+  if (typeof window !== "undefined") {
+    try {
+      const current = new URL(window.location.href);
+      if (current.port === "5173") current.port = "3000";
+      return current.origin;
+    } catch {}
+    return window.location.origin;
+  }
+  return "http://localhost:3000";
+};
+
+const API_BASE = resolveApiBase();
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 const PageIntro = (icon: string, title: string, subtitle: string) =>
   h(
     "div.mb-4.border.border-slate-400/30.rounded-xl.p-4",
@@ -33,17 +48,47 @@ const MapViewPage = (
   let mapEntity: any = null;
   let comments: any[] = [];
   let referencingCount = 0;
+  let loadingThread = false;
+  let threadError: string | null = null;
+  let mapViewApi: any = null;
+
+  const quickSearch = SuggestBox(
+    candidates,
+    "map-quick-search",
+    async (value) => {
+      if (!candidateSet.has(value)) return;
+      selectedConstruct = {
+        floor: getFloor(value) + 1,
+        constructName: stripFloor(value),
+      };
+      mapViewApi?.focusConstruct(getFloor(value), stripFloor(value));
+      await loadMapThread();
+      render();
+    }
+  );
 
   const loadMapThread = async () => {
     if (!selectedConstruct) return;
     const url = `${API_BASE}/api/map/entity?constructName=${encodeURIComponent(
       selectedConstruct.constructName
     )}&floor=${selectedConstruct.floor}`;
-    const response = await fetch(url);
-    const body = await response.json();
-    mapEntity = body.entity;
-    comments = body.comments;
-    referencingCount = body.referencingCount;
+    loadingThread = true;
+    threadError = null;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Map entity unavailable (${response.status})`);
+      const body = await response.json();
+      mapEntity = body.entity;
+      comments = body.comments;
+      referencingCount = body.referencingCount;
+    } catch (error: unknown) {
+      mapEntity = null;
+      comments = [];
+      referencingCount = 0;
+      threadError = getErrorMessage(error);
+    } finally {
+      loadingThread = false;
+    }
   };
 
   const render = () => {
@@ -53,6 +98,10 @@ const MapViewPage = (
         ? comments.map((comment) => h("li.mb-1", comment.body))
         : [h("li", "No comments yet.")];
 
+    const selectedTitle = selectedConstruct
+      ? `Floor ${selectedConstruct.floor}: ${selectedConstruct.constructName}`
+      : "Select a room/stairs on the map";
+
     const mapView = MapView({
       type: "browse",
       onChoose: async (payload) => {
@@ -60,59 +109,175 @@ const MapViewPage = (
         await loadMapThread();
         render();
       },
+      onReady: (api) => {
+        mapViewApi = api;
+        if (selectedConstruct) {
+          api.focusConstruct(selectedConstruct.floor - 1, selectedConstruct.constructName);
+        }
+      },
     });
 
-    const selectedTitle = selectedConstruct
-      ? `Floor ${selectedConstruct.floor}: ${selectedConstruct.constructName}`
-      : "Select a room/stairs on the map";
+    const insightsRow = h(
+      "div.grid.md:grid-cols-4.gap-3.mb-4",
+      h(
+        "div.border.rounded-xl.p-3",
+        h("p.text-xs.uppercase.tracking-wide.opacity-80", "Mode"),
+        h("p.text-lg.font-semibold", selectedConstruct ? "Location selected" : "Pick a spot"),
+        h("p.text-xs.opacity-70", "Click the map or use quick search to open the thread.")
+      ),
+      h(
+        "div.border.rounded-xl.p-3",
+        h("p.text-xs.uppercase.tracking-wide.opacity-80", "Floor"),
+        h("p.text-lg.font-semibold", selectedConstruct ? `Floor ${selectedConstruct.floor}` : "—"),
+        h("p.text-xs.opacity-70", "Use keyboard search to jump between floors.")
+      ),
+      h(
+        "div.border.rounded-xl.p-3",
+        h("p.text-xs.uppercase.tracking-wide.opacity-80", "References"),
+        h("p.text-lg.font-semibold", referencingCount.toString()),
+        h("p.text-xs.opacity-70", "Entities pointing at this map location.")
+      ),
+      h(
+        "div.border.rounded-xl.p-3",
+        h("p.text-xs.uppercase.tracking-wide.opacity-80", "Comments"),
+        h("p.text-lg.font-semibold", comments.length.toString()),
+        h("p.text-xs.opacity-70", "Conversation attached to this room or stairs.")
+      )
+    );
+
+    const spotlightPanel = h(
+      "div.border.rounded-xl.p-4.bg-gray-50",
+      h("div.flex.items-center.justify-between.mb-2", h("h2.text-lg.font-semibold", "Location Spotlight")),
+      h("p.text-sm.opacity-80.mb-3", "Search any room, lab, gate, or lift to center the map and instantly open its discussion thread."),
+      quickSearch.element,
+      h(
+        "div.flex.gap-2.mt-3.flex-wrap",
+        h(
+          "button.bg-blue-500.text-white.px-3.py-2.rounded",
+          {
+            onclick: () => {
+              if (selectedConstruct && mapViewApi?.focusConstruct) {
+                mapViewApi.focusConstruct(selectedConstruct.floor - 1, selectedConstruct.constructName);
+              }
+            },
+          },
+          "Center selection"
+        ),
+        h(
+          "button.bg-gray-600.text-white.px-3.py-2.rounded",
+          {
+            onclick: () => {
+              mapViewApi?.resetZoom?.();
+            },
+          },
+          "Reset zoom"
+        ),
+        h(
+          "button.bg-green-600.text-white.px-3.py-2.rounded",
+          {
+            onclick: async () => {
+              if (!selectedConstruct) return;
+              await loadMapThread();
+              render();
+            },
+          },
+          "Refresh thread"
+        )
+      )
+    );
+
+    const legendPanel = h(
+      "div.border.rounded-xl.p-4.bg-gray-50.mt-3",
+      h("h3.text-sm.font-semibold.mb-2", "Legend & navigation"),
+      h(
+        "div.flex.flex-wrap.gap-2.text-xs",
+        h("span.px-2.py-1.bg-blue-100.rounded-full", "Classrooms & labs"),
+        h("span.px-2.py-1.bg-green-50.rounded-full", "Lifts / stairs"),
+        h("span.px-2.py-1.bg-amber-100.rounded-full", "Utilities & service"),
+        h("span.px-2.py-1.bg-gray-200.rounded-full", "Multi-floor routes")
+      ),
+      h(
+        "p.text-xs.opacity-80.mt-2",
+        "Tip: use the zoom slider under the map for fine-grain control; the preset buttons snap to a readable level for tours."
+      )
+    );
+
+    const discussionPanel = h(
+      "div.border.rounded-xl.p-4.bg-gray-50",
+      h("h2.text-lg.font-semibold.mb-1", "🤝 Map Collaboration"),
+      h("p.text-sm.mb-2", selectedTitle),
+      loadingThread
+        ? h("p.text-sm.opacity-80", "Loading thread…")
+        : threadError
+          ? h("p.text-sm.text-red-500", `Thread unavailable: ${threadError}`)
+          : mapEntity
+            ? h(
+                "div",
+                h("p.text-xs.mb-2", `Entity ID: ${mapEntity.id}`),
+                h("p.text-xs.mb-2", `Entities referencing this location: ${referencingCount}`),
+                h("h3.font-semibold.mb-2", "Comments"),
+                h("ul.text-sm.list-disc.pl-5.max-h-56.overflow-auto.bg-white/50.p-2.rounded", commentNodes),
+                h(
+                  "button.bg-green-600.text-white.px-3.py-2.rounded.w-full.mt-3",
+                  {
+                    onclick: () => {
+                      if (onOpenCollaborative && mapEntity) {
+                        onOpenCollaborative({
+                          entityId: mapEntity.id,
+                          label: selectedTitle,
+                        });
+                      }
+                    },
+                  },
+                  "Open in HCMIU Collaborative"
+                )
+              )
+            : h("p.text-sm.text-gray-600", "Click a room or stairs to view discussion thread.")
+    );
+
+    const toolbar = h(
+      "div.flex.flex-wrap.gap-2.mt-2",
+      h(
+        "button.bg-red-500.text-white.px-4.py-2.rounded",
+        {
+          onclick: () => {
+            if (onExit !== undefined) onExit();
+          },
+        },
+        "Exit"
+      ),
+      h(
+        "button.bg-blue-500.text-white.px-4.py-2.rounded",
+        {
+          onclick: () => {
+            mapViewApi?.setScale?.(130);
+          },
+        },
+        "Zoom 130%"
+      ),
+      h(
+        "button.bg-blue-500.text-white.px-4.py-2.rounded",
+        {
+          onclick: () => {
+            mapViewApi?.setFloor?.(0);
+          },
+        },
+        "Jump to Floor 1"
+      )
+    );
 
     const element = h(
       "div.flex.flex-col.items-center.justify-center.min-h-screen",
-      { style: "background:#000000" },
       h(
         "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
-        { style: "max-width:72rem" },
-        PageIntro("🗺️", "Campus Explorer", "Browse the map and jump directly into collaborative discussions."),
+        { style: "max-width:80rem" },
+        PageIntro("🗺️", "Campus Explorer", "Browse the map, jump to any room with instant search, and open collaborative discussions inline."),
+        toolbar,
+        insightsRow,
         h(
-          "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
-          {
-            onclick: () => {
-              if (onExit !== undefined) onExit();
-            },
-          },
-          "Exit"
-        ),
-        h(
-          "div.grid.md:grid-cols-3.gap-4",
+          "div.grid.md:grid-cols-3.gap-4.items-start",
           h("div.md:col-span-2", mapView.element),
-          h(
-            "div.border.rounded.p-3.bg-gray-50",
-            h("h2.text-lg.font-semibold.mb-2", "🤝 Map Collaboration"),
-            h("p.text-sm.mb-2", selectedTitle),
-            mapEntity
-              ? h(
-                  "div",
-                  h("p.text-xs.mb-2", `Entity ID: ${mapEntity.id}`),
-                  h("p.text-xs.mb-2", `Entities referencing this location: ${referencingCount}`),
-                  h("h3.font-semibold.mb-2", "Comments"),
-                  h("ul.text-sm.list-disc.pl-5.max-h-56.overflow-auto", commentNodes),
-                  h(
-                    "button.bg-green-600.text-white.px-3.py-2.rounded.w-full.mt-3",
-                    {
-                      onclick: () => {
-                        if (onOpenCollaborative && mapEntity) {
-                          onOpenCollaborative({
-                            entityId: mapEntity.id,
-                            label: selectedTitle,
-                          });
-                        }
-                      },
-                    },
-                    "Open in HCMIU Collaborative"
-                  )
-                )
-              : h("p.text-sm.text-gray-600", "Click a room or stairs to view discussion thread.")
-          )
+          h("div.flex.flex-col.gap-3", spotlightPanel, discussionPanel, legendPanel)
         )
       )
     );
@@ -255,6 +420,9 @@ const ShortestPathPage = (onExit?: () => void) => {
           fromField,
           toField
         );
+        const totalHops = legs.reduce((acc, current) => acc + Math.max(0, current.path.length - 1), 0);
+        const floorsVisited = new Set(legs.map((leg) => leg.floor + 1)).size;
+        const estimatedMinutes = Math.max(1, Math.round(totalHops * 0.45));
 
         const mapView = MapView({
           type: "display path",
@@ -297,6 +465,27 @@ const ShortestPathPage = (onExit?: () => void) => {
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
             { style: "max-width:72rem" },
             PageIntro("✅", "Shortest Route Result", "Review computed legs floor-by-floor and inspect each segment."),
+            h(
+              "div.grid.md:grid-cols-3.gap-3.mb-3",
+              h(
+                "div.border.rounded-xl.p-3.bg-gray-50",
+                h("p.text-xs.uppercase.tracking-wide.opacity-80", "Total hops"),
+                h("p.text-lg.font-semibold", totalHops.toString()),
+                h("p.text-xs.opacity-70", "Approximate corridor-to-corridor transitions.")
+              ),
+              h(
+                "div.border.rounded-xl.p-3.bg-gray-50",
+                h("p.text-xs.uppercase.tracking-wide.opacity-80", "Floors visited"),
+                h("p.text-lg.font-semibold", floorsVisited.toString()),
+                h("p.text-xs.opacity-70", "Multi-floor legs include lift or stair connectors.")
+              ),
+              h(
+                "div.border.rounded-xl.p-3.bg-gray-50",
+                h("p.text-xs.uppercase.tracking-wide.opacity-80", "Walk time estimate"),
+                h("p.text-lg.font-semibold", `${estimatedMinutes} min`),
+                h("p.text-xs.opacity-70", "Based on average indoor walking speed.")
+              )
+            ),
             h(
               "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
@@ -365,7 +554,53 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
               },
               "Exit"
             ),
-            travelingSalesman.element
+            travelingSalesman.element,
+            h(
+              "div.bg-gray-50.border.rounded.p-3.mt-4",
+              h("h3.text-sm.font-semibold.mb-1", "Route presets"),
+              h("p.text-xs.opacity-80.mb-2", "Drop in curated loops to stress-test the optimizer without typing everything by hand."),
+              h(
+                "div.flex.flex-wrap.gap-2",
+                h(
+                  "button.bg-blue-500.text-white.px-3.py-2.rounded.text-xs",
+                  {
+                    onclick: () => {
+                      travelingSalesman.cleanup();
+                      locations.splice(
+                        0,
+                        locations.length,
+                        { id: generateRandomString(), value: "Floor 1: A1.109" },
+                        { id: generateRandomString(), value: "Floor 2: A1.202" },
+                        { id: generateRandomString(), value: "Floor 3: A1.303" },
+                        { id: generateRandomString(), value: "Floor 4: COFFEE STORY" }
+                      );
+                      currentStage = { type: "form" };
+                      transition();
+                    },
+                  },
+                  "Load classroom loop"
+                ),
+                h(
+                  "button.bg-green-600.text-white.px-3.py-2.rounded.text-xs",
+                  {
+                    onclick: () => {
+                      travelingSalesman.cleanup();
+                      locations.splice(
+                        0,
+                        locations.length,
+                        { id: generateRandomString(), value: "Floor 1: 1ST FLOOR LIBRARY" },
+                        { id: generateRandomString(), value: "Floor 2: FORESTA" },
+                        { id: generateRandomString(), value: "Floor 5: LA1.503" },
+                        { id: generateRandomString(), value: "Floor 6: LA1.602" }
+                      );
+                      currentStage = { type: "form" };
+                      transition();
+                    },
+                  },
+                  "Load admin errands"
+                )
+              )
+            )
           )
         );
 
@@ -469,6 +704,9 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
           }
           legs = newLegs;
         }
+        const totalSegments = legs.reduce((acc, current) => acc + Math.max(0, current.path.length - 1), 0);
+        const summaryFloors = new Set(legs.map((leg) => leg.floor + 1)).size;
+        const estimatedMinutes = Math.max(1, Math.round(totalSegments * 0.5));
 
         const mapView = MapView({
           type: "display path",
@@ -511,6 +749,27 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full",
             { style: "max-width:72rem" },
             PageIntro("📈", "Optimized Route Overview", "Inspect the generated visit sequence and each floor segment."),
+            h(
+              "div.grid.md:grid-cols-3.gap-3.mb-3",
+              h(
+                "div.border.rounded-xl.p-3.bg-gray-50",
+                h("p.text-xs.uppercase.tracking-wide.opacity-80", "Stops"),
+                h("p.text-lg.font-semibold", locations.length.toString()),
+                h("p.text-xs.opacity-70", "Unique destinations queued for this run.")
+              ),
+              h(
+                "div.border.rounded-xl.p-3.bg-gray-50",
+                h("p.text-xs.uppercase.tracking-wide.opacity-80", "Floors touched"),
+                h("p.text-lg.font-semibold", summaryFloors.toString()),
+                h("p.text-xs.opacity-70", "Helps plan elevator vs stair preferences.")
+              ),
+              h(
+                "div.border.rounded-xl.p-3.bg-gray-50",
+                h("p.text-xs.uppercase.tracking-wide.opacity-80", "Walk estimate"),
+                h("p.text-lg.font-semibold", `${estimatedMinutes} min`),
+                h("p.text-xs.opacity-70", "Approximate indoor walking time.")
+              )
+            ),
             h(
               "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
@@ -629,43 +888,59 @@ const LandingPage = (
     h(
       "div.w-full.max-w-6xl.grid.gap-5",
       h(
-        "div.bg-white.p-8.w-full",
-        h("p.text-xs.tracking-widest.uppercase.text-center.mb-3", "HCMIU Campus Intelligence"),
+        "div.bg-white.p-10.w-full.rounded-2xl",
         h(
-          "h1.text-3xl.md:text-4xl.font-bold.text-center.mb-2",
-          h("span.mr-2", "🏛️"),
-          "HCMIU Map Platform"
-        ),
-        h(
-          "p.text-center.text-sm.md:text-base.max-w-3xl.mx-auto",
-          "A refined navigation and collaboration workspace for routes, points of interest, and collective campus knowledge."
-        ),
-        h(
-          "div.grid.grid-cols-2.md:grid-cols-4.gap-3.mt-6",
+          "div.flex.flex-col.md:flex-row.md:items-center.md:justify-between.gap-4",
           h(
-            "div.border.border-slate-400/30.rounded-xl.p-3.text-center",
-            h("p.text-xs.uppercase.tracking-wide.text-slate-300", "Floors"),
-            h("p.text-xl.font-semibold", "7")
+            "div",
+            h("p.text-xs.tracking-widest.uppercase.mb-2", "HCMIU Campus Intelligence"),
+            h(
+              "h1.text-3xl.md:text-4xl.font-bold.mb-2",
+              h("span.mr-2", "🏛️"),
+              "HCMIU Map Platform"
+            ),
+            h(
+              "p.text-sm.md:text-base.max-w-3xl",
+              "A cinematic workspace for navigation, collaboration, and multi-floor planning. Pin destinations, rehearse routes, and bring discussions into every room."
+            ),
+            h(
+              "div.flex.flex-wrap.gap-2.mt-3",
+              h("span.text-xs.px-3.py-1.rounded-full.bg-blue-100.text-blue-800", "Realtime pathfinding"),
+              h("span.text-xs.px-3.py-1.rounded-full.bg-green-50.text-green-700", "Collaborative graph"),
+              h("span.text-xs.px-3.py-1.rounded-full.bg-amber-100.text-amber-800", "Research APIs")
+            )
           ),
           h(
-            "div.border.border-slate-400/30.rounded-xl.p-3.text-center",
-            h("p.text-xs.uppercase.tracking-wide.text-slate-300", "Pathfinding"),
-            h("p.text-xl.font-semibold", "Realtime")
-          ),
-          h(
-            "div.border.border-slate-400/30.rounded-xl.p-3.text-center",
-            h("p.text-xs.uppercase.tracking-wide.text-slate-300", "Collaboration"),
-            h("p.text-xl.font-semibold", "Integrated")
-          ),
-          h(
-            "div.border.border-slate-400/30.rounded-xl.p-3.text-center",
-            h("p.text-xs.uppercase.tracking-wide.text-slate-300", "Experience"),
-            h("p.text-xl.font-semibold", "Professional")
+            "div.grid.grid-cols-2.gap-3.w-full.md:w-auto",
+            h(
+              "div.border.rounded-xl.p-3.text-center",
+              h("p.text-xs.uppercase.tracking-wide.opacity-80", "Floors"),
+              h("p.text-2xl.font-semibold", "7"),
+              h("p.text-xs.opacity-70", "Stack-aware routing and lift coverage")
+            ),
+            h(
+              "div.border.rounded-xl.p-3.text-center",
+              h("p.text-xs.uppercase.tracking-wide.opacity-80", "Graph entities"),
+              h("p.text-2xl.font-semibold", "Live"),
+              h("p.text-xs.opacity-70", "Rooms, users, trials, references")
+            ),
+            h(
+              "div.border.rounded-xl.p-3.text-center",
+              h("p.text-xs.uppercase.tracking-wide.opacity-80", "Realtime"),
+              h("p.text-2xl.font-semibold", "WS"),
+              h("p.text-xs.opacity-70", "WebSocket notifications & follows")
+            ),
+            h(
+              "div.border.rounded-xl.p-3.text-center",
+              h("p.text-xs.uppercase.tracking-wide.opacity-80", "Traversal"),
+              h("p.text-2xl.font-semibold", "TSP"),
+              h("p.text-xs.opacity-70", "Multi-stop optimizer with floor jumps")
+            )
           )
         )
       ),
       h(
-        "div.bg-white.p-6.w-full",
+        "div.bg-white.p-6.w-full.rounded-2xl",
         h("h2.text-lg.font-semibold.mb-4", "Launchpad"),
         h(
           "div.grid.md:grid-cols-2.gap-3",
@@ -679,7 +954,25 @@ const LandingPage = (
           )
         ),
         h(
-          "button.bg-blue-500.text-white.px-5.py-4.w-full.mt-3.text-left",
+          "div.grid.md:grid-cols-3.gap-3.mt-3",
+          h(
+            "div.border.rounded-xl.p-4.bg-gray-50",
+            h("p.text-sm.font-semibold.mb-1", "Campus ritual"),
+            h("p.text-xs.opacity-80", "Open Map → Pin stops → Switch to Collaborative to annotate the path with your team.")
+          ),
+          h(
+            "div.border.rounded-xl.p-4.bg-gray-50",
+            h("p.text-sm.font-semibold.mb-1", "Operations mode"),
+            h("p.text-xs.opacity-80", "Use Research to trace references, then Trials to resolve disputes with transparent voting.")
+          ),
+          h(
+            "div.border.rounded-xl.p-4.bg-gray-50",
+            h("p.text-sm.font-semibold.mb-1", "Build with us"),
+            h("p.text-xs.opacity-80", "Inspect the source, wire the APIs into campus systems, or extend the map primitives.")
+          )
+        ),
+        h(
+          "button.bg-blue-500.text-white.px-5.py-4.w-full.mt-4.text-left",
           {
             onclick: () => {
               window.open("https://github.com/huynhtrankhanh/hcmiu-map", "_blank", "noreferrer");
@@ -690,7 +983,14 @@ const LandingPage = (
         )
       ),
       h(
-        "div.bg-white.p-5.w-full",
+        "div.bg-white.p-5.w-full.rounded-2xl",
+        h("h3.text-sm.font-semibold.mb-2", "Live system signals"),
+        h(
+          "div.grid.md:grid-cols-3.gap-2.mb-3",
+          h("div.border.rounded-lg.p-3", h("p.text-xs.opacity-70", "API Base"), h("p.font-semibold", API_BASE)),
+          h("div.border.rounded-lg.p-3", h("p.text-xs.opacity-70", "Collaboration graph"), h("p.font-semibold", "Ready for research queries")),
+          h("div.border.rounded-lg.p-3", h("p.text-xs.opacity-70", "Wayfinding"), h("p.font-semibold", "Shortest path + TSP online"))
+        ),
         h("p.text-sm", "Tip: Start with ", h("span.font-semibold", "View Map"), " to inspect entities, then continue in ", h("span.font-semibold", "HCMIU Collaborative"), ".")
       )
     )
