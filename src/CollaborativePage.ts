@@ -2,9 +2,21 @@ import h from "hyperscript";
 import sodium from "libsodium-wrappers-sumo";
 import { MapView } from "./MapView";
 
-const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL ??
-  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+const resolveApiBase = () => {
+  const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envBase) return envBase;
+  if (typeof window !== "undefined") {
+    try {
+      const current = new URL(window.location.href);
+      if (current.port === "5173") current.port = "3000";
+      return current.origin;
+    } catch {}
+    return window.location.origin;
+  }
+  return "http://localhost:3000";
+};
+
+const API_BASE = resolveApiBase();
 
 const jsonFetch = async (path: string, options: RequestInit = {}, token?: string) => {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -299,6 +311,18 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       return `<button data-nav="${item.key}" class="${active} px-3 py-2 rounded text-sm font-semibold">${item.icon} ${item.label}</button>`;
     }).join("");
 
+    const haloHtml = `
+      <div class="border rounded-xl p-3 mb-3 bg-gray-50">
+        <div class="flex flex-wrap gap-2 text-xs">
+          <span class="px-3 py-1 rounded-full bg-blue-100 text-blue-800">Entities: ${entities.length}</span>
+          <span class="px-3 py-1 rounded-full bg-green-50 text-green-700">Trials: ${trials.length}</span>
+          <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-800">Notifications: ${notifications.length}</span>
+          <span class="px-3 py-1 rounded-full bg-gray-200 text-gray-800">Mode: ${token ? "Authenticated" : "Public"}</span>
+          ${options?.focusedEntityId ? `<span class="px-3 py-1 rounded-full bg-green-50 text-green-700">Map focus: ${escapeHtml(options.focusedEntityLabel || options.focusedEntityId)}</span>` : ""}
+        </div>
+      </div>
+    `;
+
     let contentHtml = "";
 
     switch (currentSubPage) {
@@ -380,7 +404,9 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             <button id="create-entity" class="bg-green-600 text-white px-3 py-2 rounded w-full">Create</button>
           </section>
           ` : ""}
-          ${entityMarkup || `<div class="text-sm text-gray-600">No entities yet.</div>`}
+          <div style="max-height:60vh; overflow:auto; padding-right:0.5rem;">
+            ${entityMarkup || `<div class="text-sm text-gray-600">No entities yet.</div>`}
+          </div>
         `;
         break;
       }
@@ -435,7 +461,9 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
           </section>
           ` : ""}
           <p class="text-sm text-gray-600 mb-3">Judge agreement is an interactive dialogue: one party proposes judges, then the other can accept or counter-propose, and so on until agreement is reached.</p>
-          ${trialMarkup || `<div class="text-sm text-gray-600">No trials yet.</div>`}
+          <div style="max-height:60vh; overflow:auto; padding-right:0.5rem;">
+            ${trialMarkup || `<div class="text-sm text-gray-600">No trials yet.</div>`}
+          </div>
         `;
         break;
       }
@@ -526,7 +554,9 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         contentHtml = `
           <h2 class="text-xl font-semibold mb-3">📰 Activity Feed</h2>
           <p class="text-sm text-gray-600 mb-3">Recent activity across all entities and trials.</p>
-          ${activityMarkup}
+          <div style="max-height:60vh; overflow:auto; padding-right:0.5rem;">
+            ${activityMarkup}
+          </div>
         `;
         break;
       }
@@ -591,6 +621,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
 
     panel.innerHTML = `
       <button id="exit-btn" class="bg-red-500 text-white px-4 py-2 rounded w-full mb-3">Exit</button>
+      ${haloHtml}
       <div class="flex flex-wrap gap-2 mb-4">${navHtml}</div>
       <div id="collab-content">${contentHtml}</div>
     `;
