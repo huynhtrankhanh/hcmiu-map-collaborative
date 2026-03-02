@@ -7,7 +7,7 @@ import sodium from "libsodium-wrappers-sumo";
 
 const root = "/home/runner/work/hcmiu-map-collaborative/hcmiu-map-collaborative";
 const backendUrl = "http://localhost:3000";
-const frontendUrl = backendUrl;
+const frontendUrl = "http://localhost:5173";
 const screenshotDir = path.join(root, "artifacts", "screenshots");
 
 const runCommand = (args) => {
@@ -131,12 +131,12 @@ const run = async () => {
 
     await page.goto(frontendUrl, { waitUntil: "networkidle2" });
     await mkdir(screenshotDir, { recursive: true });
-    await page.screenshot({ path: path.join(screenshotDir, "landing-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "landing-page.png"), fullPage: true });
 
     // Map -> Collaborative deep integration
     await clickButtonByText(page, "View Map");
     await page.waitForFunction(() => document.body.textContent?.includes("Map Collaboration"));
-    await page.screenshot({ path: path.join(screenshotDir, "map-view-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "map-view-page.png"), fullPage: true });
     await page.evaluate(() => {
       const room = Array.from(document.querySelectorAll("[data-constructname]")).find((x) =>
         (x.getAttribute("data-constructname") || "").includes("A1.109")
@@ -149,7 +149,7 @@ const run = async () => {
 
     // New multi-page UI: should land on entities sub-page when focused
     await page.waitForFunction(() => document.body.textContent?.includes("Entities"));
-    await page.screenshot({ path: path.join(screenshotDir, "collaborative-entities-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-entities-page.png"), fullPage: true });
 
     // Navigate to Auth page and login
     await clickButtonByText(page, "🔐 Auth");
@@ -158,7 +158,7 @@ const run = async () => {
     await page.type("#password", password);
     await page.click("#login");
     await page.waitForFunction(() => document.body.textContent?.includes("Logged in as"), { timeout: 30_000 });
-    await page.screenshot({ path: path.join(screenshotDir, "collaborative-auth-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-auth-page.png"), fullPage: true });
 
     // Navigate to Entities page and create entity
     await clickButtonByText(page, "📡 Entities");
@@ -231,27 +231,27 @@ const run = async () => {
     // Navigate to Trials page and take screenshot
     await clickButtonByText(page, "⚖️ Trials");
     await page.waitForFunction(() => document.body.textContent?.includes("Court of Justice"));
-    await page.screenshot({ path: path.join(screenshotDir, "collaborative-trials-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-trials-page.png"), fullPage: true });
 
     // Navigate to Activity Feed and take screenshot
     await clickButtonByText(page, "📰 Activity");
     await page.waitForFunction(() => document.body.textContent?.includes("Activity Feed"));
-    await page.screenshot({ path: path.join(screenshotDir, "collaborative-activity-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-activity-page.png"), fullPage: true });
 
     // Navigate to Research page and take screenshot
     await clickButtonByText(page, "🔎 Research");
     await page.waitForFunction(() => document.body.textContent?.includes("Deep Research"));
-    await page.screenshot({ path: path.join(screenshotDir, "collaborative-research-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-research-page.png"), fullPage: true });
 
     // Navigate to Notifications page and take screenshot
     await clickButtonByText(page, "🔔 Notifications");
     await page.waitForFunction(() => document.body.textContent?.includes("Notifications"));
-    await page.screenshot({ path: path.join(screenshotDir, "collaborative-notifications-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-notifications-page.png"), fullPage: true });
 
     // Navigate to Tutorial page and take screenshot
     await clickButtonByText(page, "📖 Tutorial");
     await page.waitForFunction(() => document.body.textContent?.includes("How to Use HCMIU Collaborative"));
-    await page.screenshot({ path: path.join(screenshotDir, "collaborative-tutorial-page.png"), fullPage: false });
+    await page.screenshot({ path: path.join(screenshotDir, "collaborative-tutorial-page.png"), fullPage: true });
 
     const refs = await fetchJson(`/api/research/references?ids=${encodeURIComponent(createdEntityId)}`);
     if (!refs.entities.length) throw new Error("expected referencing entities");
