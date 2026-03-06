@@ -259,6 +259,7 @@ export const showSceneTitle = async (page, title, subtitle = "", durationMs = 25
           font-family: system-ui, sans-serif;
           color: white; text-align: center;
           transition: opacity 0.4s ease;
+          pointer-events: none;
         `;
         document.body.appendChild(card);
       }
@@ -274,7 +275,10 @@ export const showSceneTitle = async (page, title, subtitle = "", durationMs = 25
   await delay(durationMs);
   await page.evaluate(() => {
     const card = document.getElementById("demo-scene-card");
-    if (card) card.style.opacity = "0";
+    if (card) {
+      card.style.opacity = "0";
+      card.style.pointerEvents = "none";
+    }
   });
   await delay(400);
 };
@@ -304,15 +308,26 @@ export const convertToMp4 = (webmPath, mp4Path) => {
  */
 export const loginViaUI = async (page, username, password) => {
   await clickButtonByText(page, "🔐 Auth");
-  await page.waitForSelector("#username");
-  await pause(300);
-  await slowType(page, "#username", username, 35);
-  await slowType(page, "#password", password, 35);
-  await pause(300);
-  await page.click("#login");
+  await page.waitForSelector("#username", { timeout: 15_000 });
+  await pause(500);
+  // Clear any existing values
+  await page.evaluate(() => {
+    const u = document.querySelector("#username");
+    const p = document.querySelector("#password");
+    if (u) u.value = "";
+    if (p) p.value = "";
+  });
+  await page.type("#username", username, { delay: 35 });
+  await page.type("#password", password, { delay: 35 });
+  await pause(500);
+  // Use evaluate to click login (avoids overlay interference)
+  await page.evaluate(() => {
+    const btn = document.querySelector("#login");
+    if (btn) btn.click();
+  });
   await page.waitForFunction(
     () => document.body.textContent?.includes("Logged in as"),
-    { timeout: 30_000 }
+    { timeout: 60_000 }
   );
   await pause(1000);
 };
