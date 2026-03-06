@@ -12,7 +12,12 @@
     "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "test:api": "node --test backend/tests/api.test.mjs",
     "test:e2e": "node backend/tests/e2e.test.mjs",
-    "test:demo-video": "node backend/tests/demo-video.test.mjs"
+    "test:demo-video": "node backend/tests/demo-video.test.mjs",
+    "test:demo-multiuser": "node backend/tests/demo-multiuser-realtime.test.mjs",
+    "test:demo-trial": "node backend/tests/demo-trial-system.test.mjs",
+    "test:demo-map": "node backend/tests/demo-map-navigation.test.mjs",
+    "test:demo-research": "node backend/tests/demo-research-knowledge.test.mjs",
+    "test:demo-all": "node backend/tests/demo-video.test.mjs && node backend/tests/demo-multiuser-realtime.test.mjs && node backend/tests/demo-trial-system.test.mjs && node backend/tests/demo-map-navigation.test.mjs && node backend/tests/demo-research-knowledge.test.mjs"
   },
   "devDependencies": {
     "assemblyscript": "^0.27.22",
