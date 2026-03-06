@@ -11,7 +11,8 @@
     "dev:backend": "node backend/server.mjs",
     "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "test:api": "node --test backend/tests/api.test.mjs",
-    "test:e2e": "node backend/tests/e2e.test.mjs"
+    "test:e2e": "node backend/tests/e2e.test.mjs",
+    "test:demo-video": "node backend/tests/demo-video.test.mjs"
   },
   "devDependencies": {
     "assemblyscript": "^0.27.22",
