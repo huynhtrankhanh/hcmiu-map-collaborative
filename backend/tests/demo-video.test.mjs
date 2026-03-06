@@ -143,10 +143,7 @@ const clickButtonByText = async (page, text) => {
 const slowType = async (page, selector, text, ms = 80) => {
   await page.waitForSelector(selector, { timeout: 15_000 });
   await page.click(selector);
-  for (const ch of text) {
-    await page.type(selector, ch, { delay: 0 });
-    await delay(ms);
-  }
+  await page.type(selector, text, { delay: ms });
 };
 
 /** Pause long enough for the viewer to see what is on screen. */
@@ -670,10 +667,16 @@ const run = async () => {
 
     // Convert WebM to MP4
     console.log("▶ Converting to MP4 …");
-    execSync(
-      `ffmpeg -y -i ${JSON.stringify(webmPath)} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -movflags +faststart ${JSON.stringify(mp4Path)}`,
-      { stdio: "inherit", cwd: root }
-    );
+    try {
+      execSync(
+        `ffmpeg -y -i ${JSON.stringify(webmPath)} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -movflags +faststart ${JSON.stringify(mp4Path)}`,
+        { stdio: "inherit", cwd: root }
+      );
+    } catch (err) {
+      throw new Error(
+        `ffmpeg conversion failed – ensure ffmpeg is installed with libx264 support. Original error: ${err.message}`
+      );
+    }
     console.log(`✔ MP4 saved → ${mp4Path}`);
 
     console.log("\n🎬 Demo video generation complete!");
