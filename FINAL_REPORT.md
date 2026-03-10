@@ -134,7 +134,7 @@ The proposal PDF explicitly identifies this work as an individual master's proje
 
 The selected DBMS is **ArangoDB**.
 
-This choice matches the assignment constraints because the project guideline requires a DBMS selected from DB-Engines and disallows commonly used systems such as MySQL, PostgreSQL, MongoDB, and SQLite. ArangoDB appears on DB-Engines as a supported and ranked system; at the time of writing, DB-Engines lists it as **#79 overall** and **#4 among graph DBMSs**, while also classifying it as document, graph, key-value, and search capable [1][2].
+This choice matches the assignment constraints because the project guideline requires a DBMS selected from DB-Engines and disallows commonly used systems such as MySQL, PostgreSQL, MongoDB, and SQLite. ArangoDB appears on DB-Engines as a supported and ranked system; **as of March 2026**, DB-Engines lists it as **#79 overall** and **#4 among graph DBMSs**, while also classifying it as document, graph, key-value, and search capable [1][2].
 
 #### Why ArangoDB is appropriate for this project
 
