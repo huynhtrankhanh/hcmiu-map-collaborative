@@ -11,7 +11,7 @@
 
 HCMIU Map Collaborative is a web-based campus navigation and collaboration system built for Ho Chi Minh City International University. The project extends a conventional campus map into a graph-oriented information platform where rooms, stairs, users, comments, and trials are all modeled as entities that can reference one another. The system combines classic navigation features such as shortest-path finding and traveling-salesman optimization with collaborative capabilities including authentication, threaded discussions, entity following, notifications, a trial workflow, and research APIs for graph exploration.  
 
-From an advanced database perspective, the most important design choice is the use of **ArangoDB**, a DBMS that is simultaneously a document store, graph DBMS, key-value store, and search engine, all exposed through one query language. This choice matches the project domain because the application stores heterogeneous JSON-like records while also needing explicit relationships, reverse reference lookup, and shortest-path traversal across linked entities. The implementation uses a React/Vite frontend, an Express/Node.js backend, WebSockets for live updates, and ArangoDB for persistence and graph queries.  
+From an advanced database perspective, the most important design choice is the use of **ArangoDB**, a DBMS that DB-Engines classifies across document, graph, key-value, and search categories, while the official ArangoDB project describes it as combining native graphs, JSON documents, and a single query language [1][3]. This choice matches the project domain because the application stores heterogeneous JSON-like records while also needing explicit relationships, reverse reference lookup, and shortest-path traversal across linked entities. The implementation uses a React/Vite frontend, an Express/Node.js backend, WebSockets for live updates, and ArangoDB for persistence and graph queries.  
 
 This report documents the project in the format requested by the course guideline: introduction, timeline and contribution, methodology, implementation discussion, conclusion, and references. It also evaluates how well the repository demonstrates advanced DBMS usage through multi-model storage, graph traversal, reverse reference queries, and full-text-like search.
 
@@ -29,7 +29,7 @@ HCMIU Map Collaborative is an interactive campus system that serves two connecte
 
 The repository README describes the platform as a community-powered map of HCMIU that supports room discovery, shortest-route planning, real-time awareness, transparent discussion, and structured dispute resolution (`README.md`). The tutorial and API documentation further show that the system is organized around a central idea: **everything is an entity**, including map locations, users, comments, and trials (`docs/tutorial.md`, `docs/collaborative-api.md`).
 
-This makes the application especially suitable for a graph-capable database. Instead of treating content as isolated records, the system models knowledge as a connected network: comments reference entities, trials are entities, users are entities, and map locations are pre-provisioned as entities (`backend/server.mjs`).
+This makes the application especially suitable for a graph-capable database. Instead of treating content as isolated records, the system models knowledge as a connected network: comments reference entities, trials are entities, users are entities, and map locations are pre-provisioned as entities (`backend/server.mjs`). That design aligns well with ArangoDB’s published positioning as a native-graph, JSON-document, single-query-language platform [3]. It also fits the broader literature on indoor navigation systems, where environment representation, path planning, user interaction, and deployment practicality are recurring design concerns [7][9].
 
 ### 1.2 Project objectives
 
@@ -134,32 +134,34 @@ The proposal PDF explicitly identifies this work as an individual master's proje
 
 The selected DBMS is **ArangoDB**.
 
-This choice matches the assignment constraints because the project guideline requires a DBMS selected from DB-Engines and disallows commonly used systems such as MySQL, PostgreSQL, MongoDB, and SQLite. ArangoDB appears on DB-Engines as a supported and ranked system and is described as a native multi-model DBMS for graph, document, key-value, and search workloads [1][2].
+This choice matches the assignment constraints because the project guideline requires a DBMS selected from DB-Engines and disallows commonly used systems such as MySQL, PostgreSQL, MongoDB, and SQLite. ArangoDB appears on DB-Engines as a supported and ranked system; at the time of writing, DB-Engines lists it as **#79 overall** and **#4 among graph DBMSs**, while also classifying it as document, graph, key-value, and search capable [1][2].
 
 #### Why ArangoDB is appropriate for this project
 
 HCMIU Map Collaborative benefits from ArangoDB for four reasons:
 
 1. **Graph-friendly entity relationships**  
-   The project needs explicit references between entities. Comments can reference posts, users, or rooms; trials are also entities; reverse reference lookup and degree-of-separation queries are core features. These are natural graph problems.
+   The project needs explicit references between entities. Comments can reference posts, users, or rooms; trials are also entities; reverse reference lookup and degree-of-separation queries are core features. These are natural graph problems. This aligns with the graph-database literature, which emphasizes that graph models are especially suitable for highly connected data and relationship-centric querying [5].
 
 2. **Document-style records**  
    The application stores flexible JSON-like records such as entities, notifications, and trials. A document-oriented model reduces schema friction for these heterogeneous objects.
 
 3. **Single-query-language access**  
-   ArangoDB exposes graph and document operations through AQL, which simplifies backend development compared with combining separate document and graph engines [2].
+   ArangoDB exposes graph and document operations through AQL, which simplifies backend development compared with combining separate document and graph engines [3].
 
 4. **Advanced DBMS alignment with course objectives**  
-   The project is stronger academically when the database is not used only for CRUD. ArangoDB enables graph traversals, edge-based modeling, and reverse reference analysis, all of which are visible in the code.
+   The project is stronger academically when the database is not used only for CRUD. ArangoDB enables graph traversals, edge-based modeling, and reverse reference analysis, all of which are visible in the code. Comparative work that includes ArangoDB also shows that it belongs in the set of graph-oriented systems relevant to such workloads [6].
 
 #### Evidence from external technical sources
 
 - DB-Engines lists ArangoDB as a ranked DBMS and identifies it as a multi-model system spanning document, graph, key-value, and search categories [1][2].
-- The official ArangoDB project README describes native graphs, JSON documents, integrated search, and a single query language as core strengths [3].
+- The official ArangoDB project README describes native graphs, JSON documents, integrated search, transactions, and a single query language as core strengths [3].
+- A major survey of graph database models provides academic support for choosing a graph-oriented representation when relationships are central to the application domain [5].
+- Comparative research that explicitly evaluates ArangoDB among graph databases further supports its relevance as a legitimate graph-capable DBMS choice rather than a purely vendor-driven selection [6].
 
 ### 3.2 Database design
 
-Because the runtime implementation is based on ArangoDB, the project uses a **multi-model logical design** rather than a purely relational one. To match the report guideline, this section presents:
+Because the runtime implementation is based on ArangoDB, the project uses a **multi-model logical design** rather than a purely relational one. This is consistent with external descriptions of ArangoDB as a system that can combine graph and document workloads in one engine [1][3]. To match the report guideline, this section presents:
 
 1. a conceptual entity-relationship view,
 2. a relational interpretation for analysis,
@@ -213,7 +215,7 @@ The code in `backend/server.mjs` initializes the following collections:
 - `trials`
 - `entity_references` (edge collection)
 
-The edge collection is the most important database-specific design decision. Instead of storing all relationships only as arrays inside documents, the backend synchronizes references into `entity_references`, allowing graph operations such as reverse reference lookup and shortest-path traversal.
+The edge collection is the most important database-specific design decision. Instead of storing all relationships only as arrays inside documents, the backend synchronizes references into `entity_references`, allowing graph operations such as reverse reference lookup and shortest-path traversal. This is exactly the kind of workload ArangoDB’s graph-oriented design is meant to support [3].
 
 #### 3.2.4 Normalization discussion
 
@@ -357,7 +359,7 @@ These queries are visible directly in `backend/server.mjs`.
 
 #### 3.4.5 Conceptual SQL equivalents
 
-ArangoDB does not execute SQL natively [2]. However, the closest conceptual SQL-style equivalents for academic comparison are:
+ArangoDB does not execute SQL natively; DB-Engines instead lists AQL, HTTP APIs, GraphQL-related access, and graph APIs as its main access methods [1]. However, the closest conceptual SQL-style equivalents for academic comparison are:
 
 ```sql
 CREATE TABLE Users (
@@ -445,11 +447,11 @@ This separation is a good design practice because it keeps storage concerns isol
 
 #### 3.5.4 Transaction handling
 
-The backend performs sequential document and edge writes, but it does not define explicit multi-document transactions. For a demo application this is acceptable, but future improvements could use ArangoDB transaction support for stronger consistency around compound operations such as entity creation plus notification fan-out.
+The backend performs sequential document and edge writes, but it does not define explicit multi-document transactions. For a demo application this is acceptable, but future improvements could use ArangoDB transaction support for stronger consistency around compound operations such as entity creation plus notification fan-out; transaction capability is explicitly highlighted in the official ArangoDB project materials [3].
 
 ### 3.6 User interface design
 
-The user interface is organized around task-specific pages rather than one overloaded dashboard.
+The user interface is organized around task-specific pages rather than one overloaded dashboard. This is a sensible choice for a campus-oriented navigation system because prior survey work on indoor human navigation emphasizes the importance of user interaction, environment representation, and path-planning support [7].
 
 #### Main UI principles
 
@@ -511,7 +513,7 @@ Together, these transform the project from a campus map into a connected campus 
 
 #### 4.2.1 Advanced DBMS value demonstrated
 
-The project successfully demonstrates why ArangoDB is more suitable than a plain relational or plain document-only solution for this use case:
+The project successfully demonstrates why ArangoDB is more suitable than a plain relational or plain document-only solution for this use case, in line with the external characterization of ArangoDB as a multi-model graph/document platform [1][3]:
 
 - **entity references** are explicit and queryable,
 - **reverse reference lookup** is easy to implement,
@@ -529,7 +531,7 @@ The implementation uses AQL for:
 - shortest-path traversal through `ANY SHORTEST_PATH`,
 - search over concatenated text fields.
 
-The strongest database-specific feature is the shortest-path query between entities, because it directly uses graph semantics rather than emulating them in application code.
+The strongest database-specific feature is the shortest-path query between entities, because it directly uses graph semantics rather than emulating them in application code. That is the clearest point where the project benefits from choosing an advanced graph-capable DBMS rather than using a traditional relational database alone [2][3][5].
 
 #### 4.2.3 Map algorithms
 
@@ -559,7 +561,7 @@ The project must store rooms, users, comments, and trials in one coherent system
 
 #### Challenge 2: live updates
 
-Collaborative systems feel broken if users must refresh the page after every change. The solution is WebSocket-based event delivery, consistent with the browser-to-server bidirectional communication model standardized by RFC 6455 [4].
+Collaborative systems feel broken if users must refresh the page after every change. The solution is WebSocket-based event delivery, consistent with the browser-to-server bidirectional communication model standardized by RFC 6455 [4]. This also matches prior work on Node.js/WebSocket real-time web applications, which argues that such architectures are appropriate when the server must push constant state changes to clients efficiently [8].
 
 #### Challenge 3: balancing CRUD with advanced features
 
@@ -626,7 +628,7 @@ The project therefore satisfies the central intent of the assignment better than
 
 ### 5.3 Implications from an advanced database viewpoint
 
-From an advanced DBMS viewpoint, the main implication is that **data relationships are part of the product, not an afterthought**. By using ArangoDB, the system can treat references, followers, trials, and linked campus knowledge as first-class structures. This makes the application more expressive and helps justify the database choice academically.
+From an advanced DBMS viewpoint, the main implication is that **data relationships are part of the product, not an afterthought**. By using ArangoDB, the system can treat references, followers, trials, and linked campus knowledge as first-class structures. This makes the application more expressive and helps justify the database choice academically, especially given ArangoDB’s externally documented positioning around native graphs plus documents under one query model [1][3].
 
 ### 5.4 Future work
 
@@ -648,6 +650,8 @@ In summary, HCMIU Map Collaborative already provides a convincing advanced-datab
 
 ### Internal repository sources
 
+These sources are used to document what the repository actually implements.
+
 1. `Project Proposal Report_ ArangoDB.pdf`, proposal cover-page metadata, timeline, and DBMS rationale.  
 2. `README.md`, repository overview and usage instructions.  
 3. `MANIFESTO.md`, project tenets and feature requirements.  
@@ -660,7 +664,14 @@ In summary, HCMIU Map Collaborative already provides a convincing advanced-datab
 
 ### External technical sources
 
+These sources are the primary justification for DBMS selection, graph/multi-model claims, and protocol-level statements used throughout the report.
+
 [1] DB-Engines. “ArangoDB.” https://db-engines.com/en/system/ArangoDB (accessed 2026-03-10).  
 [2] DB-Engines. “DB-Engines Ranking of Graph DBMS.” https://db-engines.com/en/ranking/graph+dbms (accessed 2026-03-10).  
 [3] ArangoDB. “ArangoDB README / Key Features.” https://raw.githubusercontent.com/arangodb/arangodb/devel/README.md (accessed 2026-03-10).  
 [4] Fette, I. and Melnikov, A. “The WebSocket Protocol.” RFC 6455, IETF, 2011. https://www.rfc-editor.org/rfc/rfc6455.txt (accessed 2026-03-10).  
+[5] Angles, R. and Gutiérrez, C. “Survey of graph database models.” *ACM Computing Surveys*, 40(1), 2008. https://doi.org/10.1145/1322432.1322433  
+[6] Fernandes, D. L. and Bernardino, J. “Graph Databases Comparison: AllegroGraph, ArangoDB, InfiniteGraph, Neo4J, and OrientDB.” *DATA 2018*, 2018. https://doi.org/10.5220/0006910203730380  
+[7] Fallah, N., Apostolopoulos, I., Bekris, K., and Folmer, E. “Indoor Human Navigation Systems: A Survey.” *Interacting with Computers*, 2013. https://doi.org/10.1093/iwc/iws010  
+[8] Zhao, S. M., Xia, X. L., and Le, J. J. “A Real-Time Web Application Solution Based on Node.js and WebSocket.” *Advanced Materials Research*, 2013. https://doi.org/10.4028/www.scientific.net/amr.816-817.1111  
+[9] Han, D., Jung, S.-H., Lee, M., and Yoon, G. “Building a Practical Wi-Fi-Based Indoor Navigation System.” *IEEE Pervasive Computing*, 13(2), 2014. https://doi.org/10.1109/MPRV.2014.24  
