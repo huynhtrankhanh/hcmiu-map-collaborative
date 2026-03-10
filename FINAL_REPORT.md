@@ -1,6 +1,11 @@
 # FINAL REPORT — HCMIU Map Collaborative
 
-> Submission note: the original PDF guideline requires a formal title page with course name, topic ID, student name, student ID, and instructor name. Those personal details are not present in this repository, so they should be added by the submitting student when converting this report to the final PDF.
+**Course Name:** Advanced Database Management Systems  
+**Project Topic Title:** HCMIU Map with multiple contributors and live updates  
+**Instructor:** Nguyễn Thị Thúy Loan  
+**Master's Student:** Huỳnh Trần Khanh  
+**Student ID:** MITIU25210  
+**Repository:** https://github.com/huynhtrankhanh/hcmiu-map-collaborative
 
 ## Abstract
 
@@ -95,15 +100,12 @@ The repository also has clear technical boundaries:
 
 The repository does not contain a dated weekly diary, so the timeline below reconstructs a reasonable project progression from the current codebase structure, documentation, and tests.
 
-| Phase | Main tasks | Deliverables |
-|---|---|---|
-| Phase 1: problem framing | analyze original HCMIU Map, define collaborative extension, choose ArangoDB | proposal idea, DBMS selection rationale |
-| Phase 2: data design | define core entity model, user model, follow/notification/trial records, reference edges | logical schema, entity graph design |
-| Phase 3: backend implementation | implement Express APIs, authentication flow, ArangoDB access layer, graph queries | working backend in `backend/server.mjs` |
-| Phase 4: frontend integration | implement collaborative pages, map-to-entity linkage, forms, navigation, notifications | interactive web UI in `src/` |
-| Phase 5: advanced features | add trials, research endpoints, live WebSockets, activity feed | advanced DB-driven features |
-| Phase 6: testing and documentation | create API tests, Puppeteer E2E tests, tutorial and API docs | `/docs`, `backend/tests/`, README |
-| Phase 7: reporting | summarize architecture, methodology, and evaluation | proposal/final report |
+| Week / Dates | Phase | Main tasks | Expected outcomes |
+|---|---|---|---|
+| Week 1 (Feb 16 - Feb 22) | Design & orchestration | set up Docker Compose for ArangoDB, backend, and frontend; define document and edge collections | runnable development stack and initial schema |
+| Week 2 (Feb 23 - Mar 1) | Backend API implementation | connect Express to ArangoDB via `arangojs`; implement authentication, REST APIs, and WebSocket event distribution | working backend, proposal report submission |
+| Week 3 (Mar 2 - Mar 8) | Collaboration & frontend integration | implement entity references, full-text-like search, trial workflow, and frontend integration | complete collaborative UI connected to backend |
+| Week 4 (Mar 9 - Mar 13) | Testing & reporting | execute Node API tests and Puppeteer validation; finalize docs and final report | tested repository and completed final report |
 
 ### 2.2 Work breakdown by project phase
 
@@ -117,15 +119,11 @@ For a course submission following the provided guideline, the student is expecte
 - documentation,
 - final report writing.
 
-This repository is consistent with that expectation because the implementation, tests, and documentation are tightly aligned around one coherent application and one chosen DBMS.
+This repository is consistent with that expectation because the implementation, tests, documentation, and proposal materials are tightly aligned around one coherent application and one chosen DBMS.
 
 ### 2.3 Phase-based work description
 
-The report guideline explicitly asks for a clear statement that the work is individual. Because the repository itself cannot prove authorship details, the most accurate statement is:
-
-> This report is written for an individual-course-project submission. The final submitting student must confirm that 100% of the project adaptation, experimentation, and reporting work presented for the course is their own responsibility, in accordance with the course policy.
-
-That statement avoids inventing personal facts while still matching the required reporting structure.
+The proposal PDF explicitly identifies this work as an individual master's project by **Huỳnh Trần Khanh (MITIU25210)**. In the context of the course submission, the full design, implementation, experimentation, and reporting workflow is presented as the student's own work, consistent with the course requirement for an individual project.
 
 ---
 
@@ -650,14 +648,15 @@ In summary, HCMIU Map Collaborative already provides a convincing advanced-datab
 
 ### Internal repository sources
 
-1. `README.md`, repository overview and usage instructions.  
-2. `MANIFESTO.md`, project tenets and feature requirements.  
-3. `docs/collaborative-api.md`, backend API and WebSocket documentation.  
-4. `docs/tutorial.md`, end-user workflow documentation.  
-5. `backend/server.mjs`, backend implementation and ArangoDB query logic.  
-6. `src/getShortestPath.ts`, shortest-path implementation.  
-7. `src/solveTravelingSalesman.ts`, traveling-salesman implementation.  
-8. `backend/tests/api.test.mjs`, end-to-end API behavior validation.
+1. `Project Proposal Report_ ArangoDB.pdf`, proposal cover-page metadata, timeline, and DBMS rationale.  
+2. `README.md`, repository overview and usage instructions.  
+3. `MANIFESTO.md`, project tenets and feature requirements.  
+4. `docs/collaborative-api.md`, backend API and WebSocket documentation.  
+5. `docs/tutorial.md`, end-user workflow documentation.  
+6. `backend/server.mjs`, backend implementation and ArangoDB query logic.  
+7. `src/getShortestPath.ts`, shortest-path implementation.  
+8. `src/solveTravelingSalesman.ts`, traveling-salesman implementation.  
+9. `backend/tests/api.test.mjs`, end-to-end API behavior validation.
 
 ### External technical sources
 
@@ -665,4 +664,3 @@ In summary, HCMIU Map Collaborative already provides a convincing advanced-datab
 [2] DB-Engines. “DB-Engines Ranking of Graph DBMS.” https://db-engines.com/en/ranking/graph+dbms (accessed 2026-03-10).  
 [3] ArangoDB. “ArangoDB README / Key Features.” https://raw.githubusercontent.com/arangodb/arangodb/devel/README.md (accessed 2026-03-10).  
 [4] Fette, I. and Melnikov, A. “The WebSocket Protocol.” RFC 6455, IETF, 2011. https://www.rfc-editor.org/rfc/rfc6455.txt (accessed 2026-03-10).  
-
