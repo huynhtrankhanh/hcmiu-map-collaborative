@@ -39,7 +39,7 @@ Instructor: Nguyen Thi Thuy Loan\\[2.0cm]
 \addcontentsline{toc}{chapter}{Abstract}
 This report presents an ArangoDB-backed collaborative campus map system for Ho Chi Minh City International University. The project integrates two major capabilities: (1) algorithmic indoor navigation (single-source shortest path and multi-stop route planning) and (2) a graph-oriented social knowledge layer where rooms, users, posts, comments, and trial artifacts are linked as first-class entities. The implementation combines a Vite/TypeScript frontend and a Node.js/Express backend, with ArangoDB as the core multi-model database and WebSockets for real-time updates. 
 
-From a database perspective, the most important contribution is an explicit document-and-edge design in which content nodes are stored in document collections and semantic links are persisted in edge collections, enabling relationship-centric queries (reference discovery, full-text exploration, shortest connection paths between entities, and notification fan-out). The report documents architecture, schema decisions, data generation strategy, representative algebraic and query operations, implementation outcomes, and limitations. The system demonstrates that a multi-model DBMS can reduce impedance mismatch in connected applications compared with separating document storage and graph traversal into different engines.
+From a database perspective, the most important contribution is an explicit document-and-edge design in which content nodes are stored in document collections and semantic links are persisted in edge collections, enabling relationship-centric queries (reference discovery, full-text exploration, shortest connection paths between entities, and notification fan-out). Beyond implementation details, this version of the report adds a stronger research grounding: it compares multi-model design to polyglot persistence trade-offs, discusses consistency and real-time delivery semantics, and examines graph query workloads in terms of complexity and maintainability. The report documents architecture, schema decisions, indexing and data generation strategy, representative algebraic and query operations, implementation outcomes, and limitations. The system demonstrates that a multi-model DBMS can reduce impedance mismatch in connected applications compared with separating document storage and graph traversal into different engines, while still requiring careful operational design around access control, indexing, and event ordering.
 
 \chapter{Introduction}
 \section{System overview}
@@ -53,6 +53,11 @@ The project objectives are:
     \item Provide relationship-first collaborative features such as references, degree-of-separation analysis, and event notifications.
     \item Validate correctness through automated API and end-to-end flows.
 \end{enumerate}
+
+\section{Problem context and motivation}
+Campus-scale indoor information systems have two data characteristics that are often in tension: high schema variability (new kinds of room notes, comments, social interactions, moderation records) and high relationship density (references, follows, replies, dispute participants, and notification audiences). Traditional designs that split these concerns across separate systems can increase operational overhead and query complexity, an issue aligned with the broader argument that one-size-fits-all data management is rarely optimal for modern applications \cite{stonebraker2005onesize}.
+
+For this project, the motivation was to evaluate whether a single multi-model engine could support both rapid feature evolution and relationship-heavy analytics without introducing external graph middleware. The platform therefore serves as both a practical campus tool and an applied DBMS experiment focused on model fit, developer productivity, and query expressiveness.
 
 \section{Techniques and tools used}
 The implementation stack includes:
@@ -106,6 +111,18 @@ All project stages (design, coding, testing, deployment setup, and report writin
 \section{Selected DBMS and justification}
 ArangoDB was selected because the application requires both document storage (users, entities, trials, notifications) and graph traversal over explicit references/follows. A dedicated property-graph or document-only DBMS would require additional systems or custom join logic for the opposite paradigm. In contrast, ArangoDB natively supports document and graph workloads with AQL in one engine \cite{arangodb_aql,arangodb_multimodel}. This aligns with graph database principles for highly connected data \cite{angles2008property,robinson2015graph}.
 
+A second rationale is architectural simplicity under continuous iteration. During development, feature additions (trial negotiation history, map-linked comments, notifications) altered both entity structure and relationship depth. A multi-model database reduced migration friction by allowing document enrichment without sacrificing graph traversals. This design choice follows broader system research that warns against forcing all workloads into a single rigid model while still emphasizing careful workload-oriented tuning \cite{stonebraker2005onesize}.
+
+\section{Research-grounded design considerations}
+\subsection{Connected-data modeling}
+The platform adopts a property-graph mindset for interaction semantics: references and follows are first-class edges rather than embedded arrays only. This enables path-based reasoning (e.g., degree of separation) with explicit traversal semantics, which is difficult to maintain in purely denormalized document structures as relationship depth grows \cite{robinson2015graph}.
+
+\subsection{Consistency and real-time behavior}
+The collaboration experience uses a pragmatic consistency model: REST endpoints persist canonical state, then WebSocket events notify clients to refresh or patch views. This approach prioritizes responsiveness while accepting short-lived read-after-write lag on some clients, a trade-off consistent with eventual-consistency discussions in distributed systems \cite{vogels2009eventually}. In practice, deterministic IDs and server-side timestamps reduce ambiguity when multiple users interact concurrently.
+
+\subsection{Algorithmic foundations for navigation}
+Indoor routing components rely on weighted graph search for shortest paths and combinational route planning for multi-stop visits. Dijkstra's algorithm provides deterministic optimality under non-negative edge costs, while dynamic-programming TSP formulations motivate the bounded multi-stop planner used in the UI \cite{dijkstra1959,bellman1962}. These choices balance correctness and computational feasibility for campus-scale graphs.
+
 \section{Database design}
 \subsection{Conceptual ER-style view}
 Main conceptual objects:
@@ -141,6 +158,17 @@ Data sources are mixed:
     \item \textbf{Synthetic user/activity data} generated through UI/API interactions and automated tests.
 \end{itemize}
 At backend startup, map entities are pre-provisioned for each floor and construct name, creating stable IDs for collaborative threads.
+
+
+\section{Indexing and query-planning strategy}
+To support growth in entity and interaction volume, the data model is designed around predictable access paths:
+\begin{itemize}
+    \item \textbf{Entity listing/filtering:} index candidates include \texttt{type}, \texttt{parentEntityId}, and \texttt{createdAt}.
+    \item \textbf{Notification retrieval:} index candidates include \texttt{userId} and \texttt{read} for inbox-like queries.
+    \item \textbf{Edge traversals:} edge collections already optimize \texttt{\_from}/\texttt{\_to}; traversal cost is primarily controlled by graph diameter and branch factor.
+    \item \textbf{Map lookup:} deterministic map-entity IDs reduce dependence on expensive fuzzy matching at request time.
+\end{itemize}
+Although this project does not include a full benchmark matrix, these index assumptions were validated qualitatively during test scenarios by observing responsive API behavior for core reads and traversals.
 
 \section{Database queries and operations}
 \subsection{Relational algebra examples}
@@ -209,6 +237,7 @@ The implementation followed an incremental path:
     \item Reference graph operations support inbound reference lookup, text search, and shortest path.
     \item Trial workflow supports proposal/counter-proposal/acceptance before voting.
     \item Notifications and activity feed provide temporal awareness of collaboration.
+    \item Research endpoints expose relationship analytics that are reusable by external scripts and future dashboards.
 \end{itemize}
 
 \textbf{Database-level observations.}
@@ -216,10 +245,14 @@ The implementation followed an incremental path:
     \item Unified AQL over documents and graph edges reduces application-level data stitching.
     \item Edge collection synchronization on entity write ensures referential consistency of outbound references.
     \item Graph traversal query for degree-of-separation is concise compared with equivalent recursive SQL.
+    \item A generic entity model accelerated feature delivery, but required disciplined type checks to avoid semantic drift.
 \end{itemize}
 
+\textbf{Evaluation notes.}
+Validation was performed through automated API and browser scenarios included in the repository. The API suite focuses on authentication, collaborative entity lifecycle, follow/notification behavior, and trial transitions. End-to-end scenarios exercise map lookup and cross-page workflows under a production-like compose deployment. While these tests are functional (not load tests), they provide confidence that major workflow invariants hold after iterative changes.
+
 \textbf{Algorithmic component.}
-Shortest-route and multi-stop planning are consistent with classic graph optimization foundations (Dijkstra for shortest path, dynamic programming lineage for TSP variants) \cite{dijkstra1959,bellman1962}.
+Shortest-route and multi-stop planning are consistent with classic graph optimization foundations (Dijkstra for shortest path, dynamic programming lineage for TSP variants) \cite{dijkstra1959,bellman1962}. For user experience, path quality is constrained less by algorithmic correctness and more by graph modeling fidelity (missing connectors, inaccurate floor transitions, or stale room metadata).
 
 \section{Challenges and solutions}
 \begin{itemize}
@@ -229,6 +262,13 @@ Shortest-route and multi-stop planning are consistent with classic graph optimiz
     \textbf{Solution:} broadcast websocket events and re-fetch canonical state on client event receipt.
     \item \textbf{Challenge:} stable linkage between map coordinates and collaborative threads. \\
     \textbf{Solution:} deterministic hashed map-entity ID generation.
+\end{itemize}
+
+\section{Threats to validity}
+\begin{itemize}
+    \item \textbf{External validity:} the dataset is campus-specific; behavior on larger institutions with denser interaction graphs may differ.
+    \item \textbf{Performance validity:} no formal throughput/latency benchmark was executed, so scalability conclusions remain qualitative.
+    \item \textbf{Behavioral validity:} synthetic and developer-driven interactions may not reflect long-term real user moderation dynamics.
 \end{itemize}
 
 \chapter{Conclusion \& Future Work}
@@ -243,10 +283,11 @@ From an advanced DBMS perspective, the work illustrates practical benefits of mu
 
 \section{Future work}
 \begin{itemize}
-    \item Add ArangoSearch views and ranking for richer retrieval quality.
-    \item Introduce fine-grained authorization roles and moderation policies.
-    \item Evaluate query performance under larger synthetic workloads.
-    \item Integrate optional indoor positioning feeds and accessibility-aware routing.
+    \item Add ArangoSearch views and ranking for richer retrieval quality, including BM25-based relevance tuning for entity search.
+    \item Introduce fine-grained authorization roles and moderation policies (e.g., trusted editors, temporary suspensions, and audit trails).
+    \item Evaluate query performance under larger synthetic workloads with repeatable benchmark scripts and dashboarded latency percentiles.
+    \item Integrate optional indoor positioning feeds and accessibility-aware routing with constraints for elevators, ramps, and restricted zones.
+    \item Formalize conflict-resolution analytics from trial data (time-to-resolution, participation balance, appeal patterns) to improve governance design.
 \end{itemize}
 
 \bibliographystyle{plain}
