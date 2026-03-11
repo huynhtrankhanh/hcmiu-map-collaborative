@@ -179,7 +179,7 @@ const run = async () => {
     await mkdir(artifactDir, { recursive: true });
 
     const browser = await puppeteer.launch({
-      headless: true,
+      headless: "shell",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",

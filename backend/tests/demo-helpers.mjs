@@ -149,7 +149,7 @@ export const waitForEntityByTitle = async (title, timeoutMs = 30_000) => {
 
 export const launchBrowser = async () => {
   return puppeteer.launch({
-    headless: true,
+    headless: "shell",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -300,6 +300,50 @@ export const convertToMp4 = (webmPath, mp4Path) => {
     );
   }
   console.log(`✔ MP4 saved → ${mp4Path}`);
+};
+
+/**
+ * Concatenate multiple WebM segment files into a single MP4.
+ * Used for multi-page demos that record separate segments from
+ * different browser pages (one per user).
+ */
+export const concatSegmentsToMp4 = async (segmentPaths, mp4Path) => {
+  const listPath = mp4Path.replace(/\.mp4$/, "-segments.txt");
+  const listContent = segmentPaths.map((p) => `file '${p}'`).join("\n") + "\n";
+  const { writeFile: wf } = await import("node:fs/promises");
+  await wf(listPath, listContent);
+  console.log(`▶ Concatenating ${segmentPaths.length} segments → ${path.basename(mp4Path)} …`);
+  try {
+    execSync(
+      `ffmpeg -y -f concat -safe 0 -i ${JSON.stringify(listPath)} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -movflags +faststart ${JSON.stringify(mp4Path)}`,
+      { stdio: "inherit", cwd: root }
+    );
+  } catch (err) {
+    throw new Error(`ffmpeg concat failed: ${err.message}`);
+  }
+  // Clean up segment list and webm files
+  const { unlink: ul } = await import("node:fs/promises");
+  try { await ul(listPath); } catch {}
+  for (const seg of segmentPaths) {
+    try { await ul(seg); } catch {}
+  }
+  console.log(`✔ MP4 saved → ${mp4Path}`);
+};
+
+/**
+ * Navigate a page to the Collaborative section from the landing page.
+ */
+export const navigateToCollaborative = async (page) => {
+  await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll("button")).find((b) =>
+      (b.textContent || "").includes("HCMIU Collaborative")
+    );
+    if (btn) btn.click();
+  });
+  await page.waitForFunction(
+    () => document.body.textContent?.includes("Entities"),
+    { timeout: 30_000 }
+  );
 };
 
 /**
