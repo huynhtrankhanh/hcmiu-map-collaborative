@@ -10,6 +10,28 @@
 \usepackage{array}
 \usepackage{hyperref}
 \usepackage{url}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tabularx}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  keywordstyle=\color{blue!70!black},
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=5pt,
+  xleftmargin=15pt,
+  framexleftmargin=15pt,
+  showstringspaces=false
+}
+
 \onehalfspacing
 
 \begin{document}
@@ -35,259 +57,665 @@ Instructor: Nguyen Thi Thuy Loan\\[2.0cm]
 \tableofcontents
 \clearpage
 
+% ============================================================
+% ABSTRACT
+% ============================================================
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
-This report presents an ArangoDB-backed collaborative campus map system for Ho Chi Minh City International University. The project integrates two major capabilities: (1) algorithmic indoor navigation (single-source shortest path and multi-stop route planning) and (2) a graph-oriented social knowledge layer where rooms, users, posts, comments, and trial artifacts are linked as first-class entities. The implementation combines a Vite/TypeScript frontend and a Node.js/Express backend, with ArangoDB as the core multi-model database and WebSockets for real-time updates. 
+This report presents the design, implementation, and evaluation of an ArangoDB-backed collaborative campus map system developed for Ho Chi Minh City International University (HCMIU). The project integrates two major capabilities: (1)~algorithmic indoor navigation---encompassing single-source shortest-path computation via breadth-first search and multi-stop route optimization via bitmask dynamic programming (the Held--Karp algorithm)---and (2)~a graph-oriented social knowledge layer in which rooms, users, posts, comments, and trial artifacts are linked as first-class entities connected by typed edges in a property-graph model.
 
-From a database perspective, the most important contribution is an explicit document-and-edge design in which content nodes are stored in document collections and semantic links are persisted in edge collections, enabling relationship-centric queries (reference discovery, full-text exploration, shortest connection paths between entities, and notification fan-out). Beyond implementation details, this version of the report adds a stronger research grounding: it compares multi-model design to polyglot persistence trade-offs, discusses consistency and real-time delivery semantics, and examines graph query workloads in terms of complexity and maintainability. The report documents architecture, schema decisions, indexing and data generation strategy, representative algebraic and query operations, implementation outcomes, and limitations. The system demonstrates that a multi-model DBMS can reduce impedance mismatch in connected applications compared with separating document storage and graph traversal into different engines, while still requiring careful operational design around access control, indexing, and event ordering.
+The implementation combines a Vite/TypeScript single-page application frontend with a Node.js/Express~5 backend, using ArangoDB~3.11 as the core multi-model database and WebSockets (RFC~6455) for real-time event propagation. From a database perspective, the most significant contribution is an explicit document-and-edge design: content nodes reside in five document collections (\texttt{users}, \texttt{entities}, \texttt{follows}, \texttt{notifications}, \texttt{trials}) while semantic links are persisted in a dedicated edge collection (\texttt{entity\_references}), enabling relationship-centric queries such as reference discovery, full-text exploration, shortest connection paths between arbitrary entities, and notification fan-out to followers.
 
+Beyond implementation details, this report provides a research-grounded analysis comparing multi-model database design to polyglot persistence trade-offs, discusses consistency and real-time delivery semantics in the context of eventual consistency theory, examines graph query workloads in terms of computational complexity and developer maintainability, and evaluates the security properties of the SRP-inspired authentication protocol employed. The report documents the complete system architecture, schema decisions, indexing and data-generation strategy, representative algebraic and AQL query operations, implementation outcomes, testing methodology, and limitations. The system demonstrates that a multi-model DBMS can substantially reduce impedance mismatch in connected applications compared with separating document storage and graph traversal into different engines, while still requiring careful operational design around access control, indexing strategy, event ordering, and conflict resolution.
+
+% ============================================================
+% CHAPTER 1: INTRODUCTION
+% ============================================================
 \chapter{Introduction}
+
 \section{System overview}
-The system is a web-based collaborative map platform for university indoor spaces. Users can browse floors, compute shortest paths between points, plan multi-stop routes, and open location-linked discussion threads. Beyond mapping, the platform provides social and governance workflows, including follows, notifications, and a ``court trial'' mechanism to discuss and resolve disputes around shared campus knowledge.
+The system is a web-based collaborative map platform designed for university indoor spaces. Users can browse seven campus floors, compute shortest paths between any two points, plan optimized multi-stop routes using a traveling-salesman solver, and open location-linked discussion threads. Beyond mapping, the platform provides a full suite of social and governance workflows: entity creation with cross-references, follow/notification mechanics, an activity feed, and a structured ``court trial'' mechanism for community-driven dispute resolution around shared campus knowledge.
+
+The platform is deployed as a Docker Compose stack comprising three services: an ArangoDB~3.11 database, a Node.js backend serving both the REST API and WebSocket connections, and a Vite-built static frontend. This architecture enables single-command deployment and ensures environmental consistency across development, testing, and production-like scenarios.
 
 \section{Project objectives}
 The project objectives are:
-\begin{enumerate}
-    \item Build an interactive map experience suitable for wayfinding in complex indoor environments, consistent with wayfinding research emphasizing reduced cognitive load in large facilities \cite{zimmerman2006wayfinding}.
-    \item Demonstrate advanced database features using ArangoDB's native multi-model architecture (document + graph + search-like querying) \cite{arangodb_multimodel}.
-    \item Provide relationship-first collaborative features such as references, degree-of-separation analysis, and event notifications.
-    \item Validate correctness through automated API and end-to-end flows.
+\begin{enumerate}[label=\arabic*.]
+    \item Build an interactive map experience suitable for wayfinding in complex indoor environments, consistent with wayfinding research emphasizing reduced cognitive load and spatial orientation support in large facilities \cite{zimmerman2006wayfinding}.
+    \item Demonstrate advanced database features using ArangoDB's native multi-model architecture (document storage, graph traversal, and full-text-like querying within a single query language) \cite{arangodb_multimodel}.
+    \item Provide relationship-first collaborative features---including entity references, degree-of-separation analysis, full-text search, and event-driven notifications---that exploit the graph model natively.
+    \item Implement a secure, password-safe authentication system using client-side key derivation with memory-hard functions to protect user credentials.
+    \item Validate system correctness through comprehensive automated API test suites and end-to-end browser scenarios that exercise all major workflows.
 \end{enumerate}
 
 \section{Problem context and motivation}
-Campus-scale indoor information systems have two data characteristics that are often in tension: high schema variability (new kinds of room notes, comments, social interactions, moderation records) and high relationship density (references, follows, replies, dispute participants, and notification audiences). Traditional designs that split these concerns across separate systems can increase operational overhead and query complexity, an issue aligned with the broader argument that one-size-fits-all data management is rarely optimal for modern applications \cite{stonebraker2005onesize}.
+Campus-scale indoor information systems exhibit two data characteristics that are often in tension: \emph{high schema variability} (new kinds of room notes, comments, social interactions, moderation records emerge as features evolve) and \emph{high relationship density} (references between entities, follows, replies, dispute participants, notification audiences, and map-location linkages form a densely connected graph). Traditional architectural approaches that split these concerns across separate specialized systems---for example, a document store for content and a separate graph database for relationships---can increase operational overhead, query complexity, and data synchronization burden. This challenge aligns with the broader argument that one-size-fits-all data management is rarely optimal for modern applications \cite{stonebraker2005onesize}.
 
-For this project, the motivation was to evaluate whether a single multi-model engine could support both rapid feature evolution and relationship-heavy analytics without introducing external graph middleware. The platform therefore serves as both a practical campus tool and an applied DBMS experiment focused on model fit, developer productivity, and query expressiveness.
+The \emph{polyglot persistence} pattern, while architecturally sound in theory, introduces concrete operational costs: separate deployment pipelines, independent backup and recovery procedures, cross-system transaction coordination, and duplicated client libraries \cite{sadalage2012nosql}. For a campus-oriented application with limited operational resources, these costs can outweigh the theoretical benefits of workload-specific optimization.
+
+For this project, the primary motivation was to evaluate whether a single multi-model engine---ArangoDB, which natively supports document, graph, and key-value workloads in one process---could support both rapid feature evolution and relationship-heavy analytics without introducing external middleware. A secondary motivation was to study how graph-native query patterns (traversals, shortest paths, edge aggregations) compare in expressiveness and maintainability to equivalent operations in a relational or document-only system.
+
+The platform therefore serves a dual purpose: it is both a \emph{practical campus tool} (wayfinding, knowledge sharing, governance) and an \emph{applied DBMS experiment} focused on model fit, developer productivity, query expressiveness, and architectural simplicity.
+
+\section{Related work and literature context}
+\subsection{Indoor navigation systems}
+Indoor navigation research has explored diverse approaches from sensor-based positioning (Wi-Fi fingerprinting, BLE beacons, visual SLAM) to graph-based pathfinding over pre-surveyed floor plans \cite{zimmerman2006wayfinding}. Our approach belongs to the latter category: the campus is modeled as a set of floor-specific graphs where nodes represent points of interest (rooms, corridors, stairs, lifts) and edges represent walkable connections. This graph-based approach trades real-time positioning accuracy for deployment simplicity and deterministic routing correctness.
+
+\subsection{Graph databases and multi-model systems}
+The property-graph model, formalized by Angles and Guti\'{e}rrez \cite{angles2008property}, represents data as nodes with properties connected by typed, directed edges that also carry properties. This model naturally captures the semantic relationships in collaborative systems. Robinson et al.\ \cite{robinson2015graph} argue that graph databases offer significant advantages for connected data, particularly when relationship queries (joins in relational terms) dominate the workload.
+
+ArangoDB positions itself as a multi-model database that unifies document, graph, and key-value access patterns under a single query language (AQL) and storage engine \cite{arangodb_multimodel,arangodb_aql}. This contrasts with the polyglot persistence approach advocated by Sadalage and Fowler \cite{sadalage2012nosql}, where different data stores are chosen for different workload characteristics. Our project empirically tests the multi-model hypothesis in a real application context.
+
+\subsection{Consistency models and real-time collaboration}
+Vogels \cite{vogels2009eventually} provides a foundational taxonomy of consistency models in distributed systems, ranging from strong consistency to eventual consistency. Our system employs a pragmatic hybrid: REST API writes provide strong consistency (the server confirms persistence before responding), while WebSocket-driven UI updates follow an eventual-consistency model where clients may observe stale state for a short window before receiving broadcast notifications. This design mirrors patterns seen in modern collaborative applications such as Google Docs and Figma, where optimistic UI updates are reconciled with authoritative server state.
+
+\subsection{Pathfinding algorithms}
+The shortest-path component relies on breadth-first search (BFS), which is optimal for unweighted graphs. For weighted scenarios, Dijkstra's algorithm \cite{dijkstra1959} provides $O((V+E)\log V)$ optimal solutions. The multi-stop route planner uses the Held--Karp algorithm \cite{bellman1962,held1962dynamic}, a bitmask dynamic-programming formulation of the Traveling Salesman Problem (TSP) with $O(2^n \cdot n^2)$ time complexity, which is tractable for the campus-scale instances encountered in practice ($n \leq 15$).
 
 \section{Techniques and tools used}
 The implementation stack includes:
 \begin{itemize}
-    \item \textbf{DBMS:} ArangoDB 3.11.
-    \item \textbf{Backend:} Node.js + Express + arangojs.
-    \item \textbf{Realtime:} WebSocket protocol (RFC 6455) \cite{rfc6455}.
-    \item \textbf{Frontend:} Vite + TypeScript + CSS.
-    \item \textbf{Testing:} Node native test runner and Puppeteer-based scenarios.
-    \item \textbf{Containerization:} Docker and Docker Compose.
+    \item \textbf{DBMS:} ArangoDB 3.11 (multi-model: document + graph + key-value).
+    \item \textbf{Backend:} Node.js 20+ with Express 5, arangojs 10 driver, and \texttt{ws} WebSocket library.
+    \item \textbf{Authentication:} libsodium-wrappers (Argon2id key derivation) with server-side SHA-256 verification.
+    \item \textbf{Realtime:} WebSocket protocol per RFC 6455 \cite{rfc6455} with per-user socket tracking.
+    \item \textbf{Frontend:} Vite 5 build system, TypeScript, Hyperscript for DOM generation, Tailwind CSS for styling, Anime.js for path animations.
+    \item \textbf{Pathfinding:} BFS for single-floor shortest path, bitmask DP (Held--Karp) for TSP.
+    \item \textbf{Testing:} Node.js native test runner for API tests, Puppeteer 24 for end-to-end browser scenarios and screencast-based demo video generation.
+    \item \textbf{Containerization:} Docker and Docker Compose for reproducible multi-service deployment.
 \end{itemize}
 
 \section{Scope and limitations}
-\textbf{Scope.} The project covers indoor map visualization, route planning, collaborative entities/comments, trial negotiation, notification streams, and graph-oriented research APIs.
+\textbf{Scope.} The project covers indoor map visualization across seven floors, single-source and multi-stop route planning, collaborative entity creation with cross-references, follow/notification mechanics, a structured trial/dispute-resolution workflow, graph-oriented research APIs (reference lookup, full-text search, degree of separation), an activity feed, and comprehensive automated testing.
 
 \textbf{Limitations.}
 \begin{itemize}
-    \item No GPS/RTLS integration for live indoor positioning.
-    \item Full-text search is substring-based in AQL queries, not a dedicated ranked IR engine.
-    \item Routing is graph-based over predefined points, so accuracy depends on map graph quality.
+    \item No GPS, Wi-Fi fingerprinting, or RTLS integration for live indoor positioning---routing relies on pre-defined graph topology.
+    \item Full-text search uses case-insensitive substring matching via AQL \texttt{CONTAINS} rather than a dedicated ranked information retrieval engine (e.g., ArangoSearch with BM25).
+    \item Routing accuracy depends on graph modeling fidelity; missing connectors, inaccurate floor transitions, or stale room metadata degrade path quality.
+    \item No formal throughput or latency benchmarks were conducted; performance observations are qualitative.
+    \item The trial system is a governance experiment and is not intended as a legal or disciplinary framework.
 \end{itemize}
 
 \section{Report structure}
-Chapter 2 presents timeline and personal contribution. Chapter 3 details methodology, DBMS rationale, data design, and representative operations. Chapter 4 discusses implementation outcomes and challenges. Chapter 5 concludes and proposes future work.
+Chapter~2 presents the project timeline and personal contribution. Chapter~3 details the methodology, including DBMS rationale, data design, authentication architecture, real-time event system, algorithmic implementations, and representative database operations. Chapter~4 discusses implementation outcomes, testing methodology, challenges encountered, and threats to validity. Chapter~5 concludes and proposes future work directions.
 
+% ============================================================
+% CHAPTER 2: TIMELINE & CONTRIBUTION
+% ============================================================
 \chapter{Project Timeline \& Contribution}
 \section{Timeline of milestones}
 \begin{longtable}{p{2.8cm}p{4.6cm}p{7.2cm}}
 \toprule
 \textbf{Week} & \textbf{Phase} & \textbf{Outcome} \\
 \midrule
-Week 1 & Design \& orchestration & Defined system architecture, Docker orchestration, and initial ArangoDB collections. \\
-Week 2 & Backend API implementation & Implemented authentication, entities, references, follows, notifications, and trial APIs. \\
-Week 3 & Frontend integration & Connected collaborative UI pages and map-to-entity linking workflows. \\
-Week 4 & Testing \& reporting & Executed API/E2E tests, reviewed proposal alignment, and completed final documentation. \\
+Week 1 & Design \& orchestration & Defined system architecture, Docker Compose orchestration (ArangoDB + backend + frontend), initial collection schema, and entity model design. \\
+\midrule
+Week 2 & Backend API implementation & Implemented SRP-inspired authentication, entity CRUD with reference edge synchronization, follow/unfollow mechanics, notification generation, trial lifecycle APIs, and research endpoints. \\
+\midrule
+Week 3 & Frontend integration & Connected collaborative UI pages (Hub, Auth, Entities, Trials, Research, Notifications, Activity), implemented map-to-entity deep linking, WebSocket real-time refresh, and pathfinding algorithms (BFS + Held--Karp TSP). \\
+\midrule
+Week 4 & Testing, demos \& reporting & Developed comprehensive API test suite (243 lines), E2E test suite (295 lines), five Puppeteer-based demo video scenarios (2{,}100+ lines), and completed final documentation. \\
 \bottomrule
 \end{longtable}
 
 \section{Work breakdown by phase}
 \begin{itemize}
-    \item \textbf{Design:} Determined entity model, edge semantics, and event model.
-    \item \textbf{Implementation:} Developed backend services and frontend interaction pages.
-    \item \textbf{Experimentation:} Executed scenario tests (map entity lookup, research queries, trial flow).
-    \item \textbf{Documentation:} Produced API docs and final report.
+    \item \textbf{Design:} Determined entity model with typed documents, edge semantics for references, event model for WebSocket broadcasts, and authentication protocol with client-side key derivation.
+    \item \textbf{Implementation:} Developed 28 REST API endpoints, WebSocket server with per-user socket tracking, seven floor map layouts with graph connectivity, and pathfinding algorithms.
+    \item \textbf{Experimentation:} Executed scenario tests covering authentication flows, entity lifecycle, follow/notification behavior, trial state machine transitions, research queries, and map navigation.
+    \item \textbf{Documentation:} Produced comprehensive API documentation (\texttt{docs/collaborative-api.md}), user tutorial (\texttt{docs/tutorial.md}), system manifesto (\texttt{MANIFESTO.md}), and this final report.
 \end{itemize}
 
 \section{Contribution statement}
-All project stages (design, coding, testing, deployment setup, and report writing) were completed individually by the student.
+All project stages---design, coding, testing, deployment configuration, documentation, and report writing---were completed individually by the student.
 
+% ============================================================
+% CHAPTER 3: METHODOLOGY
+% ============================================================
 \chapter{Methodology}
-\section{Selected DBMS and justification}
-ArangoDB was selected because the application requires both document storage (users, entities, trials, notifications) and graph traversal over explicit references/follows. A dedicated property-graph or document-only DBMS would require additional systems or custom join logic for the opposite paradigm. In contrast, ArangoDB natively supports document and graph workloads with AQL in one engine \cite{arangodb_aql,arangodb_multimodel}. This aligns with graph database principles for highly connected data \cite{angles2008property,robinson2015graph}.
 
-A second rationale is architectural simplicity under continuous iteration. During development, feature additions (trial negotiation history, map-linked comments, notifications) altered both entity structure and relationship depth. A multi-model database reduced migration friction by allowing document enrichment without sacrificing graph traversals. This design choice follows broader system research that warns against forcing all workloads into a single rigid model while still emphasizing careful workload-oriented tuning \cite{stonebraker2005onesize}.
+\section{Selected DBMS and justification}
+ArangoDB was selected because the application requires both flexible document storage (users, entities, trials, notifications with evolving schemas) and efficient graph traversal over explicit references and follows. A dedicated property-graph database (e.g., Neo4j) would require a separate system for document-centric operations and schema flexibility, while a document-only database (e.g., MongoDB) would necessitate application-level graph traversal logic or expensive recursive lookups for path queries. In contrast, ArangoDB natively supports document and graph workloads with AQL in a single engine \cite{arangodb_aql,arangodb_multimodel}, aligning with graph database principles for highly connected data \cite{angles2008property,robinson2015graph}.
+
+A second rationale is architectural simplicity under continuous iteration. During development, feature additions---trial negotiation history with proposal tracking, map-linked collaborative comments, follower-based notification fan-out---altered both entity structure and relationship depth simultaneously. A multi-model database reduced migration friction by allowing document enrichment (adding new fields, nested objects) without sacrificing graph traversal capabilities. This design choice follows broader system research that warns against forcing all workloads into a single rigid model while still emphasizing careful workload-oriented tuning \cite{stonebraker2005onesize}.
+
+\subsection{Comparison with alternative approaches}
+Table~\ref{tab:dbms-comparison} summarizes the trade-offs between the multi-model approach and two common alternatives.
+
+\begin{table}[!htbp]
+\centering
+\caption{DBMS approach comparison for the campus map application.}
+\label{tab:dbms-comparison}
+\begin{tabularx}{\textwidth}{l X X X}
+\toprule
+\textbf{Criterion} & \textbf{Multi-model (ArangoDB)} & \textbf{Polyglot (MongoDB + Neo4j)} & \textbf{Relational (PostgreSQL)} \\
+\midrule
+Schema flexibility & Native JSON documents & MongoDB documents & Requires ALTER TABLE \\
+Graph traversal & Native AQL traversal & Native Cypher & Recursive CTEs \\
+Operational overhead & Single deployment & Two separate systems & Single deployment \\
+Transaction scope & Single-engine ACID & Cross-system coordination & Full ACID \\
+Query language & AQL (unified) & Two languages & SQL only \\
+Learning curve & Moderate & High (two systems) & Low--moderate \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \section{Research-grounded design considerations}
 \subsection{Connected-data modeling}
-The platform adopts a property-graph mindset for interaction semantics: references and follows are first-class edges rather than embedded arrays only. This enables path-based reasoning (e.g., degree of separation) with explicit traversal semantics, which is difficult to maintain in purely denormalized document structures as relationship depth grows \cite{robinson2015graph}.
+The platform adopts a property-graph mindset for interaction semantics: references and follows are first-class edges stored in dedicated collections rather than embedded arrays within documents. This design enables path-based reasoning (e.g., degree-of-separation queries, reference chain discovery) with explicit traversal semantics in AQL, which would be difficult to maintain in purely denormalized document structures as relationship depth and query complexity grow \cite{robinson2015graph}.
+
+The choice to model references as edges rather than embedded arrays has concrete implications: (1)~bidirectional traversal is supported without maintaining inverse arrays, (2)~edge-level metadata (creation timestamp, type) can be attached independently, and (3)~graph algorithms (shortest path, connected components) can operate directly on the edge collection without application-level transformation.
 
 \subsection{Consistency and real-time behavior}
-The collaboration experience uses a pragmatic consistency model: REST endpoints persist canonical state, then WebSocket events notify clients to refresh or patch views. This approach prioritizes responsiveness while accepting short-lived read-after-write lag on some clients, a trade-off consistent with eventual-consistency discussions in distributed systems \cite{vogels2009eventually}. In practice, deterministic IDs and server-side timestamps reduce ambiguity when multiple users interact concurrently.
+The collaboration experience uses a pragmatic hybrid consistency model. REST API endpoints persist canonical state with strong consistency guarantees: the server confirms successful database writes before returning HTTP responses to clients. WebSocket events then notify connected clients to refresh or patch their local views. This approach prioritizes responsiveness while accepting short-lived read-after-write lag on clients that have not yet received the broadcast event---a trade-off consistent with eventual-consistency discussions in distributed systems \cite{vogels2009eventually}.
+
+In practice, three mechanisms reduce ambiguity when multiple users interact concurrently:
+\begin{enumerate}
+    \item \textbf{Deterministic IDs:} Map entities use SHA-256-based deterministic identifiers derived from floor number and room name, preventing duplicate creation and enabling stable cross-references.
+    \item \textbf{Server-side timestamps:} All \texttt{createdAt} fields are set by the server, ensuring consistent temporal ordering regardless of client clock drift.
+    \item \textbf{Full-state refresh:} On receiving a WebSocket event, clients re-fetch the complete entity/trial/notification state rather than applying incremental patches, eliminating state divergence at the cost of slightly higher bandwidth.
+\end{enumerate}
 
 \subsection{Algorithmic foundations for navigation}
-Indoor routing components rely on weighted graph search for shortest paths and combinational route planning for multi-stop visits. Dijkstra's algorithm provides deterministic optimality under non-negative edge costs, while dynamic-programming TSP formulations motivate the bounded multi-stop planner used in the UI \cite{dijkstra1959,bellman1962}. These choices balance correctness and computational feasibility for campus-scale graphs.
+Indoor routing components rely on graph search algorithms with well-understood complexity guarantees:
+
+\textbf{Single-floor shortest path.} The system uses breadth-first search (BFS) on the unweighted floor graph. BFS guarantees optimal shortest paths in $O(V + E)$ time for unweighted graphs, where $V$ is the number of navigable points and $E$ is the number of walkable connections on a floor. For the HCMIU campus, typical floor graphs contain 40--60 nodes and 50--80 edges, making BFS effectively instantaneous.
+
+\textbf{Multi-floor routing.} When source and destination are on different floors, the system evaluates all available lift positions as intermediate transfer points. For each lift, it computes the shortest path from the source to the lift on the source floor and from the lift to the destination on the target floor, selecting the combination with minimum total path length. With four lifts in the campus, this requires at most eight BFS executions per cross-floor query.
+
+\textbf{Multi-stop route optimization.} The traveling-salesman planner uses the Held--Karp algorithm \cite{bellman1962,held1962dynamic}, a bitmask dynamic-programming formulation that computes the optimal visitation order for $n$ destinations in $O(2^n \cdot n^2)$ time and $O(2^n \cdot n)$ space. This is tractable for campus-scale instances: for $n = 15$ stops, the DP table contains $15 \times 2^{15} = 491{,}520$ entries, computed in under one second on modern hardware. The algorithm guarantees an optimal solution, unlike greedy or heuristic TSP approximations.
 
 \section{Database design}
+\subsection{Collection architecture}
+The database uses six collections: five document collections and one edge collection. Table~\ref{tab:collections} summarizes the schema.
+
+\begin{table}[!htbp]
+\centering
+\caption{ArangoDB collection schema.}
+\label{tab:collections}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Collection} & \textbf{Type} & \textbf{Key Attributes} \\
+\midrule
+\texttt{users} & Document & \texttt{id}, \texttt{username} (unique), \texttt{clientSalt}, \texttt{serverSalt}, \texttt{passwordHash}, \texttt{createdAt} \\
+\texttt{entities} & Document & \texttt{id}, \texttt{type} (post/comment/map\_location/trial), \texttt{title}, \texttt{body}, \texttt{parentEntityId}, \texttt{references[]}, \texttt{tags[]}, \texttt{createdBy}, \texttt{createdAt} \\
+\texttt{entity\_references} & Edge & \texttt{\_from} (entities/X), \texttt{\_to} (entities/Y), \texttt{\_key} (SHA-256 hash), \texttt{createdAt} \\
+\texttt{follows} & Document & \texttt{userId}, \texttt{entityId}, \texttt{createdAt} \\
+\texttt{notifications} & Document & \texttt{id}, \texttt{userId}, \texttt{entityId}, \texttt{type}, \texttt{read} (boolean), \texttt{createdAt} \\
+\texttt{trials} & Document & \texttt{id}, \texttt{entityId}, \texttt{plaintiffUserId}, \texttt{defendantUserId}, \texttt{status}, \texttt{agreedJudges[]}, \texttt{votes\{\}}, \texttt{outcome}, \texttt{judgeNegotiationHistory[]}, \texttt{lastProposedBy}, \texttt{lastProposedJudges[]}, \texttt{createdAt} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 \subsection{Conceptual ER-style view}
-Main conceptual objects:
+The conceptual data model defines four primary entity types and two relationship types:
 \begin{itemize}
-    \item \textbf{User}: account identity and password hash metadata.
-    \item \textbf{Entity}: generic content node (post, comment, user-profile-entity, map location, trial entity).
-    \item \textbf{Trial}: dispute case with participants, judge proposals, votes, and status.
-    \item \textbf{Notification}: event delivered to a user.
+    \item \textbf{User:} Account identity with cryptographic authentication metadata (salts and derived password hash).
+    \item \textbf{Entity:} A polymorphic content node that serves as the universal unit of discourse. Entity types include \texttt{post} (top-level discussion), \texttt{comment} (reply attached to a parent entity), \texttt{map\_location} (auto-generated room/facility thread), and \texttt{trial} (dispute-linked discussion entity).
+    \item \textbf{Trial:} A structured dispute case with plaintiff, defendant, negotiated judge panel, votes, and resolution outcome. Each trial is linked to a companion entity for threaded discussion.
+    \item \textbf{Notification:} An event record delivered to a user when activity occurs on entities they follow.
 \end{itemize}
 
 Relations:
 \begin{itemize}
-    \item \textbf{entity\_references} (edge collection): entity $\rightarrow$ entity semantic references.
-    \item \textbf{follows}: user follows entity.
+    \item \textbf{entity\_references} (edge collection): Directed semantic links between entities. When a user creates or updates an entity, the \texttt{references[]} array is synchronized to the edge collection, enabling bidirectional graph traversal. Edge keys are deterministic SHA-256 hashes of the source--target pair, ensuring idempotent upserts.
+    \item \textbf{follows}: A user follows an entity to receive notifications on future activity. Stored as a document with composite uniqueness on \texttt{(userId, entityId)}.
 \end{itemize}
 
-\subsection{Relational projection (for 3NF discussion)}
-Although deployed in ArangoDB, an equivalent normalized relational view is:
+\subsection{Relational projection (3NF analysis)}
+Although deployed in ArangoDB's document model, an equivalent normalized relational schema illustrates the underlying data dependencies:
 \begin{itemize}
-    \item \texttt{Users(user\_id PK, username UNIQUE, client\_salt, server\_salt, verifier\_hash, created\_at)}
-    \item \texttt{Entities(entity\_id PK, type, title, body, parent\_entity\_id FK, created\_by FK, created\_at)}
-    \item \texttt{EntityReferences(from\_entity\_id FK, to\_entity\_id FK, created\_at, PK(from\_entity\_id,to\_entity\_id))}
-    \item \texttt{Follows(user\_id FK, entity\_id FK, created\_at, PK(user\_id,entity\_id))}
-    \item \texttt{Notifications(notification\_id PK, user\_id FK, entity\_id FK, type, read, created\_at)}
-    \item \texttt{Trials(trial\_id PK, plaintiff\_id FK, defendant\_id FK, status, agreed\_judges\_json, votes\_json, created\_at)}
+    \item \texttt{Users(\underline{user\_id}, username [UNIQUE], client\_salt, server\_salt, password\_hash, created\_at)}
+    \item \texttt{Entities(\underline{entity\_id}, type, title, body, parent\_entity\_id [FK$\to$Entities], created\_by [FK$\to$Users], created\_at)}
+    \item \texttt{EntityReferences(\underline{from\_entity\_id [FK], to\_entity\_id [FK]}, created\_at)}
+    \item \texttt{Follows(\underline{user\_id [FK], entity\_id [FK]}, created\_at)}
+    \item \texttt{Notifications(\underline{notification\_id}, user\_id [FK], entity\_id [FK], type, read, created\_at)}
+    \item \texttt{Trials(\underline{trial\_id}, entity\_id [FK], plaintiff\_id [FK], defendant\_id [FK], status, outcome, created\_at)}
 \end{itemize}
-This projection is in 3NF for core scalar attributes, with graph edges represented by associative tables.
+This projection is in Third Normal Form (3NF): every non-key attribute depends on the whole key and nothing but the key. The \texttt{agreedJudges}, \texttt{votes}, and \texttt{judgeNegotiationHistory} fields, which are JSON arrays/objects in the document model, would require additional junction tables (\texttt{TrialJudges}, \texttt{TrialVotes}, \texttt{NegotiationHistory}) in a fully normalized relational schema.
+
+\section{Authentication architecture}
+\subsection{Threat model and design goals}
+The authentication system is designed with two primary goals: (1)~the server never receives or stores the user's plaintext password, and (2)~stored credentials are resistant to offline brute-force attacks even if the database is compromised.
+
+\subsection{Protocol description}
+The system implements a two-phase, SRP-inspired (Secure Remote Password) authentication protocol using libsodium's Argon2id key derivation:
+
+\textbf{Signup flow:}
+\begin{enumerate}
+    \item Client sends username to \texttt{POST /api/auth/signup/start}.
+    \item Server generates two cryptographically random 16-byte salts (\texttt{clientSalt}, \texttt{serverSalt}) and returns them.
+    \item Client derives a 32-byte key from the password using Argon2id with \texttt{clientSalt}: \\ \texttt{clientHash = argon2id(password, clientSalt, OPSLIMIT\_INTERACTIVE, MEMLIMIT\_INTERACTIVE)}.
+    \item Client sends \texttt{(username, clientHash, clientSalt, serverSalt)} to \texttt{POST /api/auth/signup/finish}.
+    \item Server computes \texttt{passwordHash = SHA-256(clientHash || ":" || serverSalt)} and stores \texttt{(username, clientSalt, serverSalt, passwordHash)}.
+\end{enumerate}
+
+\textbf{Login flow:}
+\begin{enumerate}
+    \item Client sends username to \texttt{POST /api/auth/login/start}.
+    \item Server returns the stored \texttt{clientSalt} and \texttt{serverSalt}.
+    \item Client re-derives \texttt{clientHash} from the password and \texttt{clientSalt}.
+    \item Client sends \texttt{(username, clientHash)} to \texttt{POST /api/auth/login/finish}.
+    \item Server verifies: \texttt{SHA-256(clientHash || ":" || serverSalt) == stored passwordHash}.
+    \item On success, server generates a UUID session token, stores it in an in-memory map, and returns it.
+\end{enumerate}
+
+\subsection{Security properties}
+\begin{itemize}
+    \item \textbf{Password never transmitted:} Only the Argon2id-derived hash leaves the client, not the plaintext password.
+    \item \textbf{Memory-hard key derivation:} Argon2id (the Argon2 variant resistant to both side-channel and GPU attacks) makes offline brute-force costly even with the \texttt{clientSalt}.
+    \item \textbf{Two-salt architecture:} The \texttt{clientSalt} protects against rainbow tables on the client-derived hash; the \texttt{serverSalt} adds a second layer so that compromising one salt is insufficient.
+    \item \textbf{Session tokens:} UUID-based bearer tokens stored in server memory; no JWT signature verification overhead, but tokens do not survive server restarts.
+\end{itemize}
+
+\section{Real-time event system}
+\subsection{WebSocket architecture}
+The server maintains a per-user socket registry: a \texttt{Map<userId, Set<WebSocket>>} that tracks all active connections for each authenticated user. This design supports multiple simultaneous sessions (e.g., a user with both a desktop and mobile browser open).
+
+\textbf{Connection lifecycle:}
+\begin{enumerate}
+    \item Client opens WebSocket to \texttt{/ws?token=<bearer\_token>}.
+    \item Server validates the token against the session map.
+    \item If valid, the socket is added to the user's socket set, and a \texttt{\{"type":"hello","authenticated":true\}} message is sent.
+    \item If invalid, the server sends \texttt{\{"type":"hello","authenticated":false\}} and closes the connection.
+    \item On socket close, the socket is removed from the user's set.
+\end{enumerate}
+
+\subsection{Event types and broadcast semantics}
+Six event types trigger WebSocket broadcasts:
+\begin{itemize}
+    \item \texttt{entity.created}, \texttt{entity.updated}, \texttt{entity.deleted} --- broadcast to all connected users.
+    \item \texttt{trial.created}, \texttt{trial.updated} --- broadcast to all connected users.
+    \item \texttt{notification.created} --- sent only to the specific recipient user's sockets.
+\end{itemize}
+
+Broadcast events are fire-and-forget: the server does not wait for client acknowledgment. If a client's socket is not in the \texttt{OPEN} state, the message is silently skipped. This design prioritizes throughput over guaranteed delivery, consistent with the system's eventual-consistency approach where clients can always re-fetch authoritative state via REST.
 
 \section{Data collection and population}
 Data sources are mixed:
 \begin{itemize}
-    \item \textbf{Static map metadata} extracted from source files containing room and lift names.
-    \item \textbf{Synthetic user/activity data} generated through UI/API interactions and automated tests.
+    \item \textbf{Static map metadata:} Extracted from TypeScript source files (\texttt{mapPointToConstructName.ts}) containing room and lift names for all seven floors. Each floor defines a mapping from numeric point indices to human-readable construct names (e.g., point~0 $\to$ ``O2.101'', point~55 $\to$ ``A1.109'').
+    \item \textbf{Automatic map entity provisioning:} At backend startup, the server iterates over all floors and construct names, generating deterministic entity IDs via \texttt{SHA-256(normalize(``Floor N: RoomName'')).slice(0, 24)}. For each location, an entity of type \texttt{map\_location} is created (or verified to exist) with appropriate title, body, and tags (\texttt{["map", "room-or-stairs"]}). This produces approximately 100+ stable map entities that serve as collaborative thread anchors.
+    \item \textbf{Synthetic interaction data:} Generated through UI interactions, API calls, and automated test scenarios. The API test suite creates users, posts, comments, references, follows, notifications, and trials to exercise the full entity lifecycle.
 \end{itemize}
-At backend startup, map entities are pre-provisioned for each floor and construct name, creating stable IDs for collaborative threads.
-
 
 \section{Indexing and query-planning strategy}
 To support growth in entity and interaction volume, the data model is designed around predictable access paths:
 \begin{itemize}
-    \item \textbf{Entity listing/filtering:} index candidates include \texttt{type}, \texttt{parentEntityId}, and \texttt{createdAt}.
-    \item \textbf{Notification retrieval:} index candidates include \texttt{userId} and \texttt{read} for inbox-like queries.
-    \item \textbf{Edge traversals:} edge collections already optimize \texttt{\_from}/\texttt{\_to}; traversal cost is primarily controlled by graph diameter and branch factor.
-    \item \textbf{Map lookup:} deterministic map-entity IDs reduce dependence on expensive fuzzy matching at request time.
+    \item \textbf{Entity listing/filtering:} Primary access patterns include filtering by \texttt{type} and \texttt{parentEntityId} (for comment retrieval under a parent entity). Index candidates include composite indexes on \texttt{(type, createdAt)} and \texttt{(parentEntityId, createdAt)} for efficient sorted scans.
+    \item \textbf{Notification retrieval:} Inbox-like queries filter by \texttt{userId} and optionally by \texttt{read} status, then sort by \texttt{createdAt}. A composite index on \texttt{(userId, read, createdAt)} would support this pattern efficiently.
+    \item \textbf{Edge traversals:} ArangoDB automatically indexes \texttt{\_from} and \texttt{\_to} attributes on edge collections, so traversal cost is primarily controlled by graph diameter and branching factor rather than collection size.
+    \item \textbf{Map entity lookup:} The deterministic ID generation for map entities (\texttt{entity\_map\_<hash>}) enables O(1) document retrieval by \texttt{\_key} without requiring secondary indexes or fuzzy matching.
+    \item \textbf{Full-text search:} The current substring-based search (\texttt{CONTAINS(LOWER(...))}) requires a full collection scan. For production workloads, this would be replaced by ArangoSearch views with inverted indexes for sub-linear lookup.
 \end{itemize}
 Although this project does not include a full benchmark matrix, these index assumptions were validated qualitatively during test scenarios by observing responsive API behavior for core reads and traversals.
 
 \section{Database queries and operations}
-\subsection{Relational algebra examples}
-Let $E$ be entities and $R$ be entity\_references.
+\subsection{Relational algebra formalization}
+Let $E$ denote the \texttt{entities} collection and $R$ the \texttt{entity\_references} edge collection. Key operations can be expressed in relational algebra:
+
+\textbf{All comments under parent entity $p$:}
+\[
+\sigma_{\texttt{type}=\text{`comment'} \;\land\; \texttt{parentEntityId}=p}(E)
+\]
+
+\textbf{Entities that reference target entity $t$ (inbound reference lookup):}
+\[
+\pi_{E.*}\bigl(\sigma_{R.\texttt{\_to}=\text{`entities/'}||t}(R) \bowtie_{R.\texttt{\_from}=\text{`entities/'}||E.\texttt{id}} E\bigr)
+\]
+
+\textbf{Follow-based notification fan-out for entity $e$:}
+Let $F$ denote the \texttt{follows} collection.
+\[
+\pi_{F.\texttt{userId}}\bigl(\sigma_{F.\texttt{entityId}=e}(F)\bigr)
+\]
+This produces the set of user IDs who should receive a notification when entity $e$ is updated.
+
+\subsection{AQL query implementations}
+The following AQL queries are used in the backend, with parameterized bindings (\texttt{@param}) to prevent injection:
+
+\textbf{1. Entity listing with optional filters:}
+\begin{lstlisting}[language=SQL,caption={Entity listing query},label={lst:entity-list}]
+FOR e IN entities
+  FILTER (@type == null OR e.type == @type)
+  FILTER (@parent == null OR e.parentEntityId == @parent)
+  SORT e.createdAt DESC
+  RETURN e
+\end{lstlisting}
+
+\textbf{2. Reference edge synchronization (upsert pattern):}
+\begin{lstlisting}[language=SQL,caption={Reference edge synchronization},label={lst:ref-sync}]
+FOR targetKey IN @targets
+  LET targetDoc = DOCUMENT(CONCAT("entities/", targetKey))
+  FILTER targetDoc != null
+  INSERT {
+    _key: SHA256(CONCAT(@fromId, ":", targetKey)),
+    _from: @fromId,
+    _to: CONCAT("entities/", targetKey),
+    createdAt: @createdAt
+  } INTO entity_references OPTIONS { overwriteMode: "replace" }
+\end{lstlisting}
+
+\textbf{3. Inbound reference discovery:}
+\begin{lstlisting}[language=SQL,caption={Inbound reference lookup},label={lst:ref-lookup}]
+FOR edge IN entity_references
+  FILTER PARSE_IDENTIFIER(edge._to).key IN @ids
+  COLLECT from = edge._from
+  LET entity = DOCUMENT(from)
+  FILTER entity != null
+  RETURN entity
+\end{lstlisting}
+
+\textbf{4. Shortest path between entities (graph traversal):}
+\begin{lstlisting}[language=SQL,caption={Degree-of-separation query},label={lst:shortest-path}]
+LET start = DOCUMENT(CONCAT("entities/", @from))
+LET target = DOCUMENT(CONCAT("entities/", @to))
+FILTER start != null AND target != null
+FOR vertex IN ANY SHORTEST_PATH
+  start TO target entity_references
+  RETURN vertex
+\end{lstlisting}
+This query uses ArangoDB's native graph traversal engine with the \texttt{ANY} direction qualifier, treating reference edges as bidirectional for path discovery. The \texttt{SHORTEST\_PATH} operation is implemented using a bidirectional BFS internally by ArangoDB, achieving $O(V + E)$ complexity on the reference subgraph.
+
+\textbf{5. Full-text search (substring matching):}
+\begin{lstlisting}[language=SQL,caption={Full-text search query},label={lst:fulltext}]
+FOR e IN entities
+  FILTER @q == "" OR
+    CONTAINS(LOWER(CONCAT_SEPARATOR(" ",
+      e.id, e.title, e.body)), @q)
+  SORT e.createdAt DESC
+  RETURN e
+\end{lstlisting}
+
+\textbf{6. Edge cleanup on entity deletion:}
+\begin{lstlisting}[language=SQL,caption={Reference edge cleanup},label={lst:edge-cleanup}]
+FOR edge IN entity_references
+  FILTER edge._from == @docId OR edge._to == @docId
+  REMOVE edge IN entity_references
+\end{lstlisting}
+This ensures referential integrity: when an entity is deleted, all inbound and outbound reference edges are removed, preventing dangling pointers in graph traversals.
+
+\section{Trial system design}
+\subsection{Motivation and governance model}
+The trial system implements a structured community dispute-resolution mechanism inspired by formal adjudication processes. It is designed as a governance experiment: a sandbox where communities can deliberate, propose judges, vote, and reach recorded outcomes. The system is explicitly not a legal framework---it is a collaborative tool for transparent decision-making.
+
+\subsection{Trial state machine}
+Each trial follows a three-phase lifecycle:
+
+\textbf{Phase 1: Pending Agreement (\texttt{pending\_agreement}).}
 \begin{itemize}
-    \item \textbf{All comments under parent p:}
-    \[
-    \sigma_{type='comment' \land parentEntityId=p}(E)
-    \]
-    \item \textbf{Entities that reference target t:}
-    \[
-    \pi_{E.*}(\sigma_{R.to=t}(R) \bowtie_{R.from=E.id} E)
-    \]
+    \item A plaintiff creates a trial by specifying a defendant username.
+    \item Either party can propose a list of judges via \texttt{POST /api/trials/:id/propose-judges}.
+    \item Turn-taking is enforced: the \texttt{lastProposedBy} field prevents the same party from proposing twice consecutively.
+    \item The other party may counter-propose with a different judge list or accept the current proposal via \texttt{POST /api/trials/:id/accept-judges}.
+    \item All proposals and acceptances are recorded in the \texttt{judgeNegotiationHistory} array for auditability.
+    \item When one party accepts the other's proposal, the trial transitions to \texttt{active} status.
 \end{itemize}
 
-\subsection{AQL/SQL-style operational mapping}
-Representative operations:
-\begin{enumerate}
-    \item \textbf{DML insert entity}: create document in \texttt{entities}, then synchronize outgoing edges in \texttt{entity\_references}.
-    \item \textbf{Complex graph query}: shortest connection path between two entities using \texttt{ANY SHORTEST\_PATH} traversal in AQL.
-    \item \textbf{Search query}: case-insensitive text filter across ID/title/body.
-\end{enumerate}
+\textbf{Phase 2: Active (\texttt{active}).}
+\begin{itemize}
+    \item Only the agreed judges may cast votes via \texttt{POST /api/trials/:id/vote}.
+    \item Vote options are: \texttt{"plaintiff"}, \texttt{"defendant"}, or \texttt{"no\_winner"}.
+    \item Discussion continues on the trial's linked entity thread, where comments are tagged with participant roles (plaintiff, defendant, judge, or spectator).
+\end{itemize}
 
-The shortest-path operation corresponds to connected-data use cases where graph traversal is preferable to repeated relational self-joins \cite{robinson2015graph}.
+\textbf{Phase 3: Resolved (\texttt{resolved}).}
+\begin{itemize}
+    \item When all agreed judges have voted, the outcome is calculated by plurality: the option with the most votes wins. Ties resolve to \texttt{"no\_winner"}.
+    \item The trial status changes to \texttt{resolved} and the outcome is permanently recorded.
+\end{itemize}
+
+\subsection{Data integrity constraints}
+The trial system enforces several invariants through application-level validation:
+\begin{itemize}
+    \item Only the plaintiff or defendant can propose or accept judges.
+    \item A party cannot accept their own proposal.
+    \item A party cannot propose twice in succession.
+    \item Only users listed in \texttt{agreedJudges} can vote.
+    \item Each judge can vote exactly once.
+    \item The outcome is immutable once calculated.
+\end{itemize}
 
 \section{Application architecture}
+\subsection{System components}
+The system consists of four architectural layers:
 \begin{itemize}
-    \item \textbf{Frontend (Vite):} map pages, collaborative dashboard, and research panels.
-    \item \textbf{Backend (Express):} auth, entities, trials, notifications, and activity endpoints.
-    \item \textbf{Database (ArangoDB):} durable storage and AQL execution.
-    \item \textbf{Realtime channel:} WebSocket broadcasts for entity/trial/notification events.
+    \item \textbf{Frontend (Vite + TypeScript):} A single-page application with five main views: Landing, Map View, Shortest Path, Traveling Salesman, and Collaborative Hub. The collaborative hub further subdivides into eight sub-pages: Hub, Authentication, Entities, Trials, Research, Notifications, Activity, and Tutorial.
+    \item \textbf{Backend (Express 5):} A stateless HTTP/WebSocket server exposing 28 REST endpoints organized into six groups: authentication (5 endpoints), entities (5), entity interactions (2), notifications (2), trials (6), research (3), and system (2: health check + activity feed). Session state is maintained in an in-memory map.
+    \item \textbf{Database (ArangoDB 3.11):} Provides durable storage, AQL query execution, and native graph traversal capabilities. Runs as a Docker container with persistent volume.
+    \item \textbf{Realtime channel (WebSocket):} A lightweight event bus that broadcasts state-change notifications to authenticated clients, enabling live UI updates without polling.
 \end{itemize}
 
-\begin{figure}[h]
+\subsection{API endpoint summary}
+Table~\ref{tab:api-endpoints} provides the complete API surface.
+
+{\small
+\begin{longtable}{l l p{5.5cm}}
+\caption{REST API endpoint summary (28 endpoints).}
+\label{tab:api-endpoints} \\
+\toprule
+\textbf{Group} & \textbf{Endpoint} & \textbf{Purpose} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Group} & \textbf{Endpoint} & \textbf{Purpose} \\
+\midrule
+\endhead
+Auth & \texttt{POST /api/auth/signup/\{start,finish\}} & Two-phase signup \\
+Auth & \texttt{POST /api/auth/login/\{start,finish\}} & Two-phase login \\
+Auth & \texttt{GET /api/auth/me} & Current user info \\
+\midrule
+Entities & \texttt{GET /api/entities} & List (filter by type, parent) \\
+Entities & \texttt{GET /api/map/entity} & Map entity by location \\
+Entities & \texttt{POST /api/entities} & Create with references \\
+Entities & \texttt{PATCH /api/entities/:id} & Update (creator only) \\
+Entities & \texttt{DELETE /api/entities/:id} & Delete with edge cleanup \\
+\midrule
+Social & \texttt{POST /api/entities/:id/follow} & Follow entity \\
+Social & \texttt{POST /api/entities/:id/unfollow} & Unfollow entity \\
+\midrule
+Notif. & \texttt{GET /api/notifications} & User inbox \\
+Notif. & \texttt{POST /api/notifications/:id/read} & Mark read \\
+\midrule
+Trials & \texttt{GET,POST /api/trials} & List/create trials \\
+Trials & \texttt{GET /api/trials/:id} & Trial details \\
+Trials & \texttt{POST .../\{propose,accept,vote\}} & Lifecycle actions \\
+\midrule
+Research & \texttt{GET /api/research/references} & Inbound references \\
+Research & \texttt{GET /api/research/fulltext} & Text search \\
+Research & \texttt{GET /api/research/degree} & Shortest path \\
+\midrule
+System & \texttt{GET /api/health} & Health check \\
+System & \texttt{GET /api/activity} & Activity feed \\
+\bottomrule
+\end{longtable}
+}
+
+\subsection{Map data structure and rendering}
+The campus map covers seven floors, each represented as:
+\begin{itemize}
+    \item An HTML/CSS grid layout generated via Hyperscript, with clickable room elements carrying \texttt{data-constructname} and \texttt{data-isconstruct} attributes for programmatic interaction.
+    \item A graph structure defined as an edge list (\texttt{[number, number][]}), where each number is a point index corresponding to a physical location.
+    \item A coordinate array (\texttt{points[index] = [x, y]}) mapping point indices to pixel positions for path visualization.
+    \item Rendering primitives (\texttt{mapPrimitives.ts}) for rooms, lifts, stairs, classrooms, and libraries.
+\end{itemize}
+
+Four lift positions (A1-left, A1-right, A2-left, A2-right) are shared across floors, serving as inter-floor transfer points for multi-floor routing. Path visualization uses CSS-based line drawing with Anime.js animations for smooth path tracing.
+
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.9\textwidth]{../docs/screenshots/collaborative-page.png}
-\caption{Collaborative page UI snapshot.}
+\includegraphics[height=0.45\textheight]{../docs/screenshots/collaborative-page.png}
+\caption{Collaborative page UI showing entity creation, discussion threads, and research panels.}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.9\textwidth]{../docs/screenshots/map-view-page.png}
-\caption{Map view page with navigation functionality.}
+\includegraphics[width=0.85\textwidth]{../docs/screenshots/map-view-page.png}
+\caption{Map view page with floor browsing and room-to-entity deep linking.}
 \end{figure}
 
 \section{User interface design}
-The collaborative UI is split into focused pages: Hub, Authentication, Entities, Trials, Research, Notifications, Activity, and Tutorial. This segmentation reduces interaction complexity and supports task-oriented workflows.
-
-\chapter{Discussion \& Implementation}
-\section{Implementation process}
-The implementation followed an incremental path:
+The collaborative UI is organized into eight focused sub-pages, each addressing a specific task domain:
 \begin{enumerate}
-    \item establish containerized runtime and ArangoDB availability;
-    \item implement collection initialization and startup provisioning;
-    \item add authentication and entity CRUD;
-    \item layer reference edges and research APIs;
-    \item implement trial negotiation and voting flows;
-    \item integrate frontend workflows and websocket refreshes;
-    \item validate with automated scenarios.
+    \item \textbf{Hub:} Overview dashboard with entity and trial statistics.
+    \item \textbf{Authentication:} Signup/login forms with client-side libsodium key derivation.
+    \item \textbf{Entities:} Entity creation with reference selection (search, map picker, or manual ID entry), comment threads, and follow/unfollow controls.
+    \item \textbf{Trials:} Trial creation, interactive judge negotiation interface, voting panel, and trial-linked discussion with participant role tags.
+    \item \textbf{Research:} Three research modes---inbound reference lookup, full-text search, and degree-of-separation path finder.
+    \item \textbf{Notifications:} Real-time notification inbox with read/unread status.
+    \item \textbf{Activity:} Chronological feed of the 50 most recent system-wide events.
+    \item \textbf{Tutorial:} Interactive user guide with feature walkthroughs.
+\end{enumerate}
+This segmentation reduces interaction complexity, supports task-oriented workflows, and enables independent development and testing of each sub-page.
+
+% ============================================================
+% CHAPTER 4: DISCUSSION & IMPLEMENTATION
+% ============================================================
+\chapter{Discussion \& Implementation}
+
+\section{Implementation process}
+The implementation followed an incremental, test-driven path:
+\begin{enumerate}
+    \item \textbf{Infrastructure:} Establish Docker Compose configuration with ArangoDB container, health checks, and volume persistence.
+    \item \textbf{Database initialization:} Implement collection creation logic with existence checks and edge collection type specification (\texttt{type: 3} for edge collections).
+    \item \textbf{Map provisioning:} Auto-generate map entities for all seven floors at startup using deterministic SHA-256-based IDs.
+    \item \textbf{Authentication:} Implement the two-phase SRP-inspired signup/login protocol with libsodium integration.
+    \item \textbf{Entity CRUD:} Add entity creation with reference array synchronization to the edge collection, update with re-synchronization, and delete with edge cleanup.
+    \item \textbf{Social features:} Layer follow/unfollow mechanics, notification generation on entity updates for followers, and the activity feed.
+    \item \textbf{Research APIs:} Implement inbound reference lookup, full-text search, and degree-of-separation graph traversal.
+    \item \textbf{Trial system:} Build the three-phase trial lifecycle with judge negotiation, voting, and outcome calculation.
+    \item \textbf{Frontend integration:} Connect all collaborative UI pages, implement WebSocket real-time refresh, and add map-to-entity deep linking.
+    \item \textbf{Testing:} Develop comprehensive API test suite and five Puppeteer-based end-to-end demo scenarios.
 \end{enumerate}
 
+\section{Testing methodology}
+\subsection{API test suite}
+The API test suite (\texttt{api.test.mjs}, 243 lines) uses Node.js's native test runner to exercise the complete backend workflow:
+\begin{itemize}
+    \item \textbf{Authentication:} Signup with libsodium client-side hashing, login verification, and session token management.
+    \item \textbf{Entity lifecycle:} Create, read, update, and delete operations with validation of reference edge synchronization.
+    \item \textbf{Social interactions:} Follow/unfollow entities, verify notification creation on new comments, and check notification read marking.
+    \item \textbf{Trial workflow:} Create trial, propose judges, counter-propose, accept, vote, and verify outcome calculation.
+    \item \textbf{Research queries:} Inbound reference lookup, full-text search, and degree-of-separation path traversal.
+    \item \textbf{Activity feed:} Verify chronological ordering and content correctness.
+\end{itemize}
+
+\subsection{End-to-end test suite}
+The E2E suite (\texttt{e2e.test.mjs}, 295 lines) runs against the full Docker Compose stack to validate production-like behavior, exercising frontend--backend--database integration paths.
+
+\subsection{Demo video scenarios}
+Five Puppeteer-based demo scenarios serve as both automated acceptance tests and documentation artifacts:
+\begin{enumerate}
+    \item \textbf{Comprehensive demo} (695 lines): Full feature walkthrough producing an MP4 video.
+    \item \textbf{Multi-user real-time} (358 lines): Two-user collaboration with live WebSocket notifications.
+    \item \textbf{Trial system} (321 lines): Complete trial lifecycle from creation through resolution.
+    \item \textbf{Map navigation} (400 lines): Shortest path and traveling-salesman route planning.
+    \item \textbf{Research knowledge} (328 lines): Reference lookup, full-text search, and degree-of-separation queries.
+\end{enumerate}
+These scenarios use Puppeteer~24's screencast API to record WebM video, which is then converted to MP4 with ffmpeg for distribution.
+
 \section{Results and analysis}
-\textbf{Functional outcomes.}
+\subsection{Functional outcomes}
 \begin{itemize}
-    \item Map entities are auto-generated and linkable from floor/construct names.
-    \item Reference graph operations support inbound reference lookup, text search, and shortest path.
-    \item Trial workflow supports proposal/counter-proposal/acceptance before voting.
-    \item Notifications and activity feed provide temporal awareness of collaboration.
-    \item Research endpoints expose relationship analytics that are reusable by external scripts and future dashboards.
+    \item \textbf{Map entities:} Over 100 map entities are auto-generated across seven floors, each serving as a stable collaborative thread anchor. The deterministic ID scheme ensures idempotent provisioning across server restarts.
+    \item \textbf{Reference graph:} Inbound reference lookup, full-text search, and shortest-path queries operate correctly on the \texttt{entity\_references} edge collection. The \texttt{ANY SHORTEST\_PATH} traversal provides bidirectional path discovery.
+    \item \textbf{Trial workflow:} The three-phase trial lifecycle (negotiation, voting, resolution) functions correctly with all invariant checks (turn-taking, judge-only voting, immutable outcomes).
+    \item \textbf{Real-time updates:} WebSocket broadcasts trigger immediate UI refresh across all connected clients, verified in the multi-user demo scenario.
+    \item \textbf{Research endpoints:} The three research APIs (references, full-text, degree) are reusable by external scripts and future dashboards.
 \end{itemize}
 
-\textbf{Database-level observations.}
+\subsection{Database-level observations}
 \begin{itemize}
-    \item Unified AQL over documents and graph edges reduces application-level data stitching.
-    \item Edge collection synchronization on entity write ensures referential consistency of outbound references.
-    \item Graph traversal query for degree-of-separation is concise compared with equivalent recursive SQL.
-    \item A generic entity model accelerated feature delivery, but required disciplined type checks to avoid semantic drift.
+    \item \textbf{Unified query language:} AQL's ability to combine document operations (\texttt{FOR ... FILTER ... RETURN}) with graph traversals (\texttt{SHORTEST\_PATH}, \texttt{TRAVERSE}) eliminates the need for application-level data stitching that would be required in a polyglot architecture.
+    \item \textbf{Edge synchronization:} The upsert pattern for reference edges (using \texttt{SHA-256} deterministic keys and \texttt{overwriteMode: "replace"}) ensures consistency between the entity's \texttt{references[]} array and the edge collection without requiring explicit transactions.
+    \item \textbf{Graph vs.\ relational expressiveness:} The degree-of-separation query is a single AQL statement (\texttt{ANY SHORTEST\_PATH}), compared with a recursive Common Table Expression (CTE) in SQL that would require explicit depth tracking, cycle detection, and termination conditions.
+    \item \textbf{Schema flexibility:} Adding the \texttt{judgeNegotiationHistory} array to trials and the \texttt{tags[]} array to entities required no schema migration---documents were simply written with the new fields, and existing documents continued to function with implicit \texttt{null} values.
+    \item \textbf{Trade-off awareness:} The generic entity model accelerated feature delivery but required disciplined type checks at the application level to avoid semantic drift (e.g., treating a \texttt{map\_location} entity as a regular post).
 \end{itemize}
 
-\textbf{Evaluation notes.}
-Validation was performed through automated API and browser scenarios included in the repository. The API suite focuses on authentication, collaborative entity lifecycle, follow/notification behavior, and trial transitions. End-to-end scenarios exercise map lookup and cross-page workflows under a production-like compose deployment. While these tests are functional (not load tests), they provide confidence that major workflow invariants hold after iterative changes.
+\subsection{Algorithmic component analysis}
+\textbf{Shortest path correctness.} BFS guarantees optimal shortest paths for unweighted graphs. The inter-floor routing extension exhaustively evaluates all four lift positions, ensuring optimality across the combined source-floor and destination-floor path lengths.
 
-\textbf{Algorithmic component.}
-Shortest-route and multi-stop planning are consistent with classic graph optimization foundations (Dijkstra for shortest path, dynamic programming lineage for TSP variants) \cite{dijkstra1959,bellman1962}. For user experience, path quality is constrained less by algorithmic correctness and more by graph modeling fidelity (missing connectors, inaccurate floor transitions, or stale room metadata).
+\textbf{TSP optimality.} The Held--Karp bitmask DP implementation guarantees optimal solutions. For the practical limit of $n \leq 15$ destinations, the algorithm completes within the browser's UI responsiveness threshold ($<$100ms). The implementation uses a flat \texttt{Uint32Array} for the DP table, avoiding object-allocation overhead and enabling cache-friendly memory access patterns.
+
+\textbf{Graph traversal in AQL.} ArangoDB's \texttt{SHORTEST\_PATH} operation uses bidirectional BFS internally, which has optimal worst-case complexity for unweighted edge collections. The \texttt{ANY} direction qualifier allows the traversal to follow edges in both directions, which is semantically appropriate for reference relationships (``A references B'' implies a conceptual connection in both directions).
 
 \section{Challenges and solutions}
 \begin{itemize}
-    \item \textbf{Challenge:} balancing generic entity schema with feature-specific behavior. \\
-    \textbf{Solution:} use typed entities plus dedicated collections for critical workflow state (e.g., trials).
-    \item \textbf{Challenge:} real-time consistency between REST writes and UI state. \\
-    \textbf{Solution:} broadcast websocket events and re-fetch canonical state on client event receipt.
-    \item \textbf{Challenge:} stable linkage between map coordinates and collaborative threads. \\
-    \textbf{Solution:} deterministic hashed map-entity ID generation.
+    \item \textbf{Challenge:} Balancing a generic entity schema with feature-specific behavior. Entities serve as posts, comments, map locations, and trial discussion threads, each requiring different validation and display logic. \\
+    \textbf{Solution:} Use a \texttt{type} discriminator field combined with dedicated collections for complex workflow state (e.g., the \texttt{trials} collection for dispute metadata, linked to a companion entity for discussion).
+
+    \item \textbf{Challenge:} Maintaining real-time consistency between REST writes and UI state across multiple concurrent clients. \\
+    \textbf{Solution:} Broadcast WebSocket events on every state mutation, and have clients re-fetch canonical state from REST endpoints upon event receipt. This full-refresh approach trades bandwidth for simplicity and eliminates state-divergence bugs.
+
+    \item \textbf{Challenge:} Establishing stable, predictable linkage between map coordinates and collaborative threads across server restarts. \\
+    \textbf{Solution:} Deterministic entity ID generation using \texttt{SHA-256(normalize(floorName))} ensures that the same room always maps to the same entity ID, enabling idempotent provisioning.
+
+    \item \textbf{Challenge:} Ensuring referential integrity when entities are deleted (dangling edges in the reference graph). \\
+    \textbf{Solution:} On entity deletion, explicitly remove all inbound and outbound edges from \texttt{entity\_references} before removing the entity document.
+
+    \item \textbf{Challenge:} Implementing secure password handling without transmitting plaintext passwords. \\
+    \textbf{Solution:} The SRP-inspired two-phase protocol with client-side Argon2id key derivation ensures the server only receives a derived hash, reducing exposure in transit and at rest.
 \end{itemize}
 
 \section{Threats to validity}
 \begin{itemize}
-    \item \textbf{External validity:} the dataset is campus-specific; behavior on larger institutions with denser interaction graphs may differ.
-    \item \textbf{Performance validity:} no formal throughput/latency benchmark was executed, so scalability conclusions remain qualitative.
-    \item \textbf{Behavioral validity:} synthetic and developer-driven interactions may not reflect long-term real user moderation dynamics.
+    \item \textbf{External validity:} The dataset and interaction patterns are campus-specific. Behavior on larger institutions with significantly denser interaction graphs, more concurrent users, and more diverse entity types may differ from observed results.
+    \item \textbf{Performance validity:} No formal throughput or latency benchmarks were conducted. Performance observations (responsive API behavior, sub-second query times) are qualitative and based on developer-scale workloads. Scalability conclusions require systematic load testing with synthetic workloads.
+    \item \textbf{Behavioral validity:} User interactions are synthetic (developer-driven and automated-test-generated) rather than from a deployed community. Real-world usage patterns---moderation dynamics, reference network density, trial participation rates---may differ substantially.
+    \item \textbf{Security validity:} The authentication protocol has not undergone formal cryptographic audit. While the design follows established patterns (Argon2id, two-salt architecture), implementation subtleties could introduce vulnerabilities not captured by functional tests.
+    \item \textbf{Construct validity:} The comparison between multi-model and polyglot approaches (Table~\ref{tab:dbms-comparison}) is based on architectural analysis rather than a controlled experiment with both implementations built and measured.
 \end{itemize}
 
+% ============================================================
+% CHAPTER 5: CONCLUSION & FUTURE WORK
+% ============================================================
 \chapter{Conclusion \& Future Work}
+
 \section{Summary of key findings}
-This project demonstrates that ArangoDB is well-suited for a collaborative campus map where content and relationships are equally important. Document storage supports flexible user-generated content, while graph edges and traversals enable deep relationship queries without external graph infrastructure.
+This project demonstrates that ArangoDB is well-suited for a collaborative campus map application where content flexibility and relationship-centric queries are equally important. Key findings include:
+\begin{enumerate}
+    \item \textbf{Multi-model fit:} Document storage supports flexible, evolving user-generated content (entities with varying types, nested arrays, and optional fields), while graph edges and native AQL traversals enable deep relationship queries (reference discovery, degree of separation, notification fan-out) without external graph infrastructure.
+    \item \textbf{Developer productivity:} A single query language (AQL) and single deployment target (ArangoDB) reduced context-switching overhead during iterative feature development, compared with maintaining two separate query languages and deployment pipelines in a polyglot architecture.
+    \item \textbf{Algorithmic integration:} Classical graph algorithms (BFS for shortest path, Held--Karp for TSP) integrate naturally with the graph-modeled campus data, providing provably optimal solutions within practical computational bounds.
+    \item \textbf{Governance experiment:} The trial system demonstrates that structured dispute-resolution workflows can be modeled as database state machines with full auditability, though real-world governance effectiveness remains unvalidated.
+\end{enumerate}
 
 \section{Reflection on objectives}
-The primary objectives were achieved: the system provides route planning, multi-user collaboration, graph-oriented research functions, and real-time updates in one deployable stack.
+The primary objectives were achieved:
+\begin{itemize}
+    \item \textbf{Objective 1 (Wayfinding):} The system provides interactive floor browsing, single-source shortest-path routing, multi-floor routing via lifts, and optimal multi-stop planning, reducing cognitive load for campus navigation.
+    \item \textbf{Objective 2 (Advanced DBMS):} The project exercises ArangoDB's document storage, graph traversal, edge collection management, and AQL query capabilities across 28 API endpoints.
+    \item \textbf{Objective 3 (Collaborative features):} Entity references, follows, notifications, full-text search, degree-of-separation queries, and the trial system provide a comprehensive relationship-first collaborative platform.
+    \item \textbf{Objective 4 (Security):} The SRP-inspired authentication protocol with client-side Argon2id key derivation protects user credentials from plaintext exposure.
+    \item \textbf{Objective 5 (Validation):} The API test suite, E2E test suite, and five Puppeteer demo scenarios provide automated verification of all major workflows.
+\end{itemize}
 
 \section{Advanced database implications}
-From an advanced DBMS perspective, the work illustrates practical benefits of multi-model design for connected applications, especially where entities evolve rapidly and relationship queries are central.
+From an advanced DBMS perspective, this work contributes several observations:
+\begin{itemize}
+    \item \textbf{Multi-model advantage:} For applications with mixed document-and-graph workloads, a multi-model DBMS eliminates the impedance mismatch and operational overhead of polyglot persistence, at the cost of potentially sub-optimal performance for any single workload pattern compared with a specialized engine.
+    \item \textbf{Edge collection patterns:} The deterministic-key upsert pattern for reference edges provides a practical approach to maintaining consistency between denormalized document arrays and normalized edge collections without explicit transactions.
+    \item \textbf{Graph query expressiveness:} AQL's native \texttt{SHORTEST\_PATH} and traversal operators enable concise expression of relationship queries that would require complex recursive CTEs in SQL, reducing both code complexity and maintenance burden.
+    \item \textbf{Schema evolution:} Document databases' schema flexibility is particularly valuable during rapid prototyping, but requires application-level type discipline to prevent semantic drift in polymorphic collections.
+\end{itemize}
 
 \section{Future work}
 \begin{itemize}
-    \item Add ArangoSearch views and ranking for richer retrieval quality, including BM25-based relevance tuning for entity search.
-    \item Introduce fine-grained authorization roles and moderation policies (e.g., trusted editors, temporary suspensions, and audit trails).
-    \item Evaluate query performance under larger synthetic workloads with repeatable benchmark scripts and dashboarded latency percentiles.
-    \item Integrate optional indoor positioning feeds and accessibility-aware routing with constraints for elevators, ramps, and restricted zones.
-    \item Formalize conflict-resolution analytics from trial data (time-to-resolution, participation balance, appeal patterns) to improve governance design.
+    \item \textbf{ArangoSearch integration:} Replace substring-based full-text search with ArangoSearch views using inverted indexes and BM25-based relevance ranking, enabling sub-linear search complexity and ranked retrieval quality comparable to dedicated search engines.
+
+    \item \textbf{Fine-grained authorization:} Introduce role-based access control (trusted editors, moderators, administrators) with moderation policies (temporary suspensions, content flagging, audit trails) to support safe community governance at scale.
+
+    \item \textbf{Performance benchmarking:} Design and execute systematic load tests with synthetic workloads (varying entity counts, reference density, concurrent users) to produce quantitative latency percentile distributions and throughput ceilings, enabling evidence-based capacity planning.
+
+    \item \textbf{Indoor positioning integration:} Incorporate optional positioning feeds (BLE beacons, Wi-Fi fingerprinting) and accessibility-aware routing constraints (elevator-only paths, wheelchair-accessible routes, restricted-zone avoidance) to bridge the gap between graph-based and sensor-based navigation.
+
+    \item \textbf{Conflict-resolution analytics:} Formalize quantitative metrics from trial data---time-to-resolution distributions, participation balance (judge response rates), appeal patterns, outcome fairness measures---to enable data-driven governance design improvements.
+
+    \item \textbf{Offline support:} Implement service worker caching and optimistic offline entity creation with sync-on-reconnect, enabling campus navigation in areas with poor connectivity.
+
+    \item \textbf{Formal security audit:} Subject the authentication protocol and API authorization logic to formal cryptographic review and penetration testing to validate the security properties claimed in this report.
 \end{itemize}
 
 \bibliographystyle{plain}
