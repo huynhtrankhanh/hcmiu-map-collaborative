@@ -5,6 +5,7 @@
 \usepackage[a4paper,left=2.5cm,right=1.5cm,top=2cm,bottom=2.5cm]{geometry}
 \usepackage{setspace}
 \usepackage{graphicx}
+\graphicspath{{../docs/screenshots/}}
 \usepackage{longtable}
 \usepackage{booktabs}
 \usepackage{array}
@@ -224,7 +225,7 @@ Indoor routing components rely on graph search algorithms with well-understood c
 
 \textbf{Multi-floor routing.} When source and destination are on different floors, the system evaluates all available lift positions as intermediate transfer points. For each lift, it computes the shortest path from the source to the lift on the source floor and from the lift to the destination on the target floor, selecting the combination with minimum total path length. With four lifts in the campus, this requires at most eight BFS executions per cross-floor query.
 
-\textbf{Multi-stop route optimization.} The traveling-salesman planner uses the Held--Karp algorithm \cite{bellman1962,held1962dynamic}, a bitmask dynamic-programming formulation that computes the optimal visitation order for $n$ destinations in $O(2^n \cdot n^2)$ time and $O(2^n \cdot n)$ space. This is tractable for campus-scale instances: for $n = 15$ stops, the DP table contains $15 \times 2^{15} = 491{,}520$ entries, computed in under one second on modern hardware. The algorithm guarantees an optimal solution, unlike greedy or heuristic TSP approximations.
+\textbf{Multi-stop route optimization.} The traveling-salesman planner uses the Held--Karp algorithm \cite{bellman1962,held1962dynamic}, a bitmask dynamic-programming formulation that computes the optimal visitation order for $n$ destinations in $O(2^n \cdot n^2)$ time and $O(2^n \cdot n)$ space. This is tractable for campus-scale instances: for $n = 15$ stops, the DP table contains $15 \times 2^{15} = 491{,}520$ entries, which is expected to complete well within interactive response times on modern hardware. The algorithm guarantees an optimal solution, unlike greedy or heuristic TSP approximations.
 
 \section{Database design}
 \subsection{Collection architecture}
@@ -545,13 +546,13 @@ Four lift positions (A1-left, A1-right, A2-left, A2-right) are shared across flo
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[height=0.45\textheight]{../docs/screenshots/collaborative-page.png}
+\includegraphics[height=0.45\textheight]{collaborative-page.png}
 \caption{Collaborative page UI showing entity creation, discussion threads, and research panels.}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{../docs/screenshots/map-view-page.png}
+\includegraphics[width=0.85\textwidth]{map-view-page.png}
 \caption{Map view page with floor browsing and room-to-entity deep linking.}
 \end{figure}
 
@@ -637,7 +638,7 @@ These scenarios use Puppeteer~24's screencast API to record WebM video, which is
 \subsection{Algorithmic component analysis}
 \textbf{Shortest path correctness.} BFS guarantees optimal shortest paths for unweighted graphs. The inter-floor routing extension exhaustively evaluates all four lift positions, ensuring optimality across the combined source-floor and destination-floor path lengths.
 
-\textbf{TSP optimality.} The Held--Karp bitmask DP implementation guarantees optimal solutions. For the practical limit of $n \leq 15$ destinations, the algorithm completes within the browser's UI responsiveness threshold ($<$100ms). The implementation uses a flat \texttt{Uint32Array} for the DP table, avoiding object-allocation overhead and enabling cache-friendly memory access patterns.
+\textbf{TSP optimality.} The Held--Karp bitmask DP implementation guarantees optimal solutions. For the practical limit of $n \leq 15$ destinations, the $O(2^n \cdot n^2)$ complexity yields a manageable number of operations, and the implementation uses a flat \texttt{Uint32Array} for the DP table, avoiding object-allocation overhead and enabling cache-friendly memory access patterns.
 
 \textbf{Graph traversal in AQL.} ArangoDB's \texttt{SHORTEST\_PATH} operation uses bidirectional BFS internally, which has optimal worst-case complexity for unweighted edge collections. The \texttt{ANY} direction qualifier allows the traversal to follow edges in both directions, which is semantically appropriate for reference relationships (``A references B'' implies a conceptual connection in both directions).
 
