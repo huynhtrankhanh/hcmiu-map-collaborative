@@ -7,8 +7,9 @@
  *   • Both users comment on the entity in a discussion thread
  *   • Perspective banners clearly mark which user is on screen
  *
- * Uses a single browser page with login/logout to switch users.
- * On-screen overlays and scene cards indicate the active user.
+ * Uses SEPARATE browser pages per user (no login/logout switching).
+ * Segments are recorded from each page and concatenated into the
+ * final MP4 with ffmpeg.
  *
  * Usage:
  *   node backend/tests/demo-multiuser-realtime.test.mjs
@@ -19,18 +20,18 @@
 
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { mkdir, unlink } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import {
   root, backendUrl, frontendUrl, artifactDir,
   composeUp, composeDown, waitForStack,
   fetchJson, signup,
   launchBrowser, clickButtonByText, slowType, pause,
   showOverlay, hideOverlay, showSceneTitle,
-  convertToMp4, loginViaUI, waitForEntityByTitle,
+  concatSegmentsToMp4, loginViaUI, waitForEntityByTitle,
+  navigateToCollaborative,
 } from "./demo-helpers.mjs";
 
-const webmPath = path.join(artifactDir, "demo-multiuser-realtime.webm");
-const mp4Path  = path.join(artifactDir, "demo-multiuser-realtime.mp4");
+const mp4Path = path.join(artifactDir, "demo-multiuser-realtime.mp4");
 
 const run = async () => {
   composeUp();
@@ -38,7 +39,7 @@ const run = async () => {
   try {
     await waitForStack();
 
-    /* ---- Create users ---- */
+    /* ---- Create users via API ---- */
     const ts = Date.now();
     const aliceName = `alice_${ts}`;
     const bobName   = `bob_${ts}`;
@@ -47,146 +48,147 @@ const run = async () => {
     const aliceCreds = await signup(aliceName, pw);
     const bobCreds   = await signup(bobName, pw);
 
-    /* ---- Launch browser ---- */
+    /* ---- Launch browser with TWO pages ---- */
     await mkdir(artifactDir, { recursive: true });
     const browser = await launchBrowser();
-    const page = await browser.newPage();
-    page.on("dialog", async (d) => {
-      if (d.type() === "prompt") await d.accept("Edited via demo");
-      else await d.accept();
-    });
 
-    console.log("▶ Starting screencast …");
-    const recorder = await page.screencast({ path: webmPath });
+    const alicePage = await browser.newPage();
+    const bobPage   = await browser.newPage();
+
+    alicePage.on("dialog", async (d) => d.accept());
+    bobPage.on("dialog", async (d) => d.accept());
+
+    /* ---- Setup: navigate both pages & log in once ---- */
+    console.log("▶ Setting up Alice's page …");
+    await alicePage.goto(frontendUrl, { waitUntil: "networkidle2" });
+    await navigateToCollaborative(alicePage);
+    await loginViaUI(alicePage, aliceName, pw);
+
+    console.log("▶ Setting up Bob's page …");
+    await bobPage.goto(frontendUrl, { waitUntil: "networkidle2" });
+    await navigateToCollaborative(bobPage);
+    await loginViaUI(bobPage, bobName, pw);
+
+    console.log("✔ Both users logged in — starting demo");
+
+    /* Segment tracking */
+    const segments = [];
+    let segIdx = 0;
+    const segPath = () =>
+      path.join(artifactDir, `mu-seg-${String(segIdx++).padStart(2, "0")}.webm`);
 
     /* ============================================================== */
-    /*  SCENE 1 – Introduction                                        */
+    /*  SCENE 1 – Introduction (shown on Alice's page)                */
     /* ============================================================== */
-    await page.goto(frontendUrl, { waitUntil: "networkidle2" });
+    let sp = segPath();
+    let rec = await alicePage.screencast({ path: sp });
+    segments.push(sp);
+
     await showSceneTitle(
-      page,
+      alicePage,
       "Multi-User Real-Time Collaboration",
       "Demonstrating live updates between Alice and Bob",
       3000
     );
 
     /* ============================================================== */
-    /*  SCENE 2 – Alice logs in                                       */
+    /*  SCENE 2 – Alice creates an entity                             */
     /* ============================================================== */
-    console.log("  Scene 2: Alice logs in");
-    await showOverlay(page, `👤 ALICE's Screen`, "#2563eb");
-    await pause(800);
-    await clickButtonByText(page, "HCMIU Collaborative");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Entities")
-    );
-    await loginViaUI(page, aliceName, pw);
-    await showOverlay(page, `👤 ALICE — Logged in as ${aliceName}`, "#16a34a");
-    await pause(2000);
+    console.log("  Scene 2: Alice creates an entity");
+    await showOverlay(alicePage, `👤 ALICE — Logged in as ${aliceName}`, "#2563eb");
+    await pause(1500);
 
-    /* ============================================================== */
-    /*  SCENE 3 – Alice creates an entity                             */
-    /* ============================================================== */
-    console.log("  Scene 3: Alice creates an entity");
-    await showOverlay(page, "👤 ALICE — Creating a new discussion entity", "#2563eb");
+    await showOverlay(alicePage, "👤 ALICE — Creating a new discussion entity", "#2563eb");
     await pause(800);
-    await clickButtonByText(page, "📡 Entities");
-    await page.waitForSelector("#entity-title");
+    await clickButtonByText(alicePage, "📡 Entities");
+    await alicePage.waitForSelector("#entity-title", { timeout: 15_000 });
     await pause(500);
 
-    await slowType(page, "#entity-title", "Campus WiFi Improvements", 45);
+    await slowType(alicePage, "#entity-title", "Campus WiFi Improvements", 45);
     await slowType(
-      page,
+      alicePage,
       "#entity-body",
       "The library WiFi has been slow during peak hours. Let's discuss solutions.",
       25
     );
     await pause(500);
-    await page.click("#create-entity");
-    await showOverlay(page, "👤 ALICE — Entity created! Waiting for it to appear…", "#16a34a");
+    await alicePage.click("#create-entity");
+    await showOverlay(alicePage, "👤 ALICE — Entity created! Waiting for it to appear…", "#16a34a");
     const entityId = await waitForEntityByTitle("Campus WiFi Improvements", 40_000);
-    await pause(2000);
+    await pause(1500);
 
     // Scroll to see the new entity
-    await page.evaluate(() =>
+    await alicePage.evaluate(() =>
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
     );
     await pause(1500);
 
+    await rec.stop();
+
     /* ============================================================== */
-    /*  SCENE 4 – Transition to Bob                                   */
+    /*  SCENE 3 – Bob sees Alice's entity (Bob's page)                */
     /* ============================================================== */
-    console.log("  Scene 4: Transition to Bob");
+    console.log("  Scene 3: Bob views Alice's entity");
+    sp = segPath();
+    rec = await bobPage.screencast({ path: sp });
+    segments.push(sp);
+
     await showSceneTitle(
-      page,
-      "Switching to Bob's Perspective",
-      `${bobName} logs in from another device and sees Alice's entity`,
+      bobPage,
+      "Bob's Perspective",
+      `${bobName} sees Alice's entity appear in real time`,
       2500
     );
 
-    /* ============================================================== */
-    /*  SCENE 5 – Bob logs in and sees Alice's entity                 */
-    /* ============================================================== */
-    console.log("  Scene 5: Bob logs in");
-    await page.goto(frontendUrl, { waitUntil: "networkidle2" });
-    await showOverlay(page, `👤 BOB's Screen`, "#dc2626");
-    await clickButtonByText(page, "HCMIU Collaborative");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Entities")
-    );
-    await loginViaUI(page, bobName, pw);
-    await showOverlay(page, `👤 BOB — Logged in as ${bobName}`, "#16a34a");
-    await pause(1500);
+    await showOverlay(bobPage, `👤 BOB — Logged in as ${bobName}`, "#dc2626");
+    await pause(1000);
 
-    await showOverlay(page, "👤 BOB — Checking entities (Alice's post should be here)", "#dc2626");
-    await clickButtonByText(page, "📡 Entities");
+    await showOverlay(bobPage, "👤 BOB — Checking entities (Alice's post should be here)", "#dc2626");
+    await clickButtonByText(bobPage, "📡 Entities");
     await pause(1500);
-    await page.evaluate(() =>
+    await bobPage.evaluate(() =>
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
     );
     await pause(1000);
-    await page.waitForFunction(
+    await bobPage.waitForFunction(
       (title) => document.body.textContent?.includes(title),
       { timeout: 15_000 },
       "Campus WiFi Improvements"
     );
-    await showOverlay(page, "👤 BOB — Alice's entity is visible! ✓", "#16a34a");
+    await showOverlay(bobPage, "👤 BOB — Alice's entity is visible! ✓", "#16a34a");
     await pause(2000);
 
     /* ============================================================== */
-    /*  SCENE 6 – Bob follows the entity                              */
+    /*  SCENE 4 – Bob follows the entity                              */
     /* ============================================================== */
-    console.log("  Scene 6: Bob follows the entity");
-    await showOverlay(page, "👤 BOB — Following Alice's entity for notifications", "#dc2626");
+    console.log("  Scene 4: Bob follows the entity");
+    await showOverlay(bobPage, "👤 BOB — Following Alice's entity for notifications", "#dc2626");
     await fetchJson(
       `/api/entities/${entityId}/follow`,
       { method: "POST" },
       bobCreds.token
     );
-    await showOverlay(page, "👤 BOB — Now following 'Campus WiFi Improvements' ✓", "#16a34a");
+    await showOverlay(bobPage, "👤 BOB — Now following 'Campus WiFi Improvements' ✓", "#16a34a");
     await pause(2000);
 
+    await rec.stop();
+
     /* ============================================================== */
-    /*  SCENE 7 – Switch to Alice: add comment                        */
+    /*  SCENE 5 – Alice adds a comment (Alice's page)                 */
     /* ============================================================== */
-    console.log("  Scene 7: Alice comments");
+    console.log("  Scene 5: Alice comments");
+    sp = segPath();
+    rec = await alicePage.screencast({ path: sp });
+    segments.push(sp);
+
     await showSceneTitle(
-      page,
-      "Back to Alice's Perspective",
+      alicePage,
+      "Back to Alice",
       "Alice adds a comment — Bob will be notified",
       2500
     );
 
-    await page.goto(frontendUrl, { waitUntil: "networkidle2" });
-    await showOverlay(page, "👤 ALICE's Screen", "#2563eb");
-    await clickButtonByText(page, "HCMIU Collaborative");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Entities")
-    );
-    await loginViaUI(page, aliceName, pw);
-    await pause(500);
-
-    await showOverlay(page, "👤 ALICE — Adding a comment on the entity", "#2563eb");
+    await showOverlay(alicePage, "👤 ALICE — Adding a comment on the entity", "#2563eb");
     await fetchJson(
       "/api/entities",
       {
@@ -201,53 +203,52 @@ const run = async () => {
       },
       aliceCreds.token
     );
-    await showOverlay(page, "👤 ALICE — Comment posted! Bob should get a notification", "#16a34a");
+    await showOverlay(alicePage, "👤 ALICE — Comment posted! Bob should get a notification", "#16a34a");
     await pause(1500);
 
-    await clickButtonByText(page, "📰 Activity");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Activity Feed")
+    await clickButtonByText(alicePage, "📰 Activity");
+    await alicePage.waitForFunction(() =>
+      document.body.textContent?.includes("Activity Feed"),
+      { timeout: 15_000 }
     );
     await pause(2000);
 
+    await rec.stop();
+
     /* ============================================================== */
-    /*  SCENE 8 – Bob checks notifications                            */
+    /*  SCENE 6 – Bob checks notifications (Bob's page)               */
     /* ============================================================== */
-    console.log("  Scene 8: Bob checks notifications");
+    console.log("  Scene 6: Bob checks notifications");
+    sp = segPath();
+    rec = await bobPage.screencast({ path: sp });
+    segments.push(sp);
+
     await showSceneTitle(
-      page,
-      "Switching to Bob's Perspective",
+      bobPage,
+      "Bob's Perspective",
       "Bob checks notifications — should see Alice's comment alert",
       2500
     );
 
-    await page.goto(frontendUrl, { waitUntil: "networkidle2" });
-    await showOverlay(page, "👤 BOB's Screen", "#dc2626");
-    await clickButtonByText(page, "HCMIU Collaborative");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Entities")
-    );
-    await loginViaUI(page, bobName, pw);
-    await pause(500);
-
-    await showOverlay(page, "👤 BOB — Checking notifications", "#dc2626");
-    await clickButtonByText(page, "🔔 Notifications");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Notifications")
+    await showOverlay(bobPage, "👤 BOB — Checking notifications", "#dc2626");
+    await clickButtonByText(bobPage, "🔔 Notifications");
+    await bobPage.waitForFunction(() =>
+      document.body.textContent?.includes("Notifications"),
+      { timeout: 15_000 }
     );
     await pause(2500);
-    await page.evaluate(() =>
+    await bobPage.evaluate(() =>
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
     );
     await pause(1500);
-    await showOverlay(page, "👤 BOB — Notification received from Alice's comment! ✓", "#16a34a");
+    await showOverlay(bobPage, "👤 BOB — Notification received from Alice's comment! ✓", "#16a34a");
     await pause(2000);
 
     /* ============================================================== */
-    /*  SCENE 9 – Bob replies                                         */
+    /*  SCENE 7 – Bob replies                                         */
     /* ============================================================== */
-    console.log("  Scene 9: Bob replies");
-    await showOverlay(page, "👤 BOB — Replying to the discussion", "#dc2626");
+    console.log("  Scene 7: Bob replies");
+    await showOverlay(bobPage, "👤 BOB — Replying to the discussion", "#dc2626");
 
     await fetchJson(
       "/api/entities",
@@ -263,41 +264,39 @@ const run = async () => {
       },
       bobCreds.token
     );
-    await showOverlay(page, "👤 BOB — Reply posted! ✓", "#16a34a");
+    await showOverlay(bobPage, "👤 BOB — Reply posted! ✓", "#16a34a");
     await pause(1500);
 
-    await clickButtonByText(page, "📰 Activity");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Activity Feed")
+    await clickButtonByText(bobPage, "📰 Activity");
+    await bobPage.waitForFunction(() =>
+      document.body.textContent?.includes("Activity Feed"),
+      { timeout: 15_000 }
     );
-    await showOverlay(page, "👤 BOB — Activity feed shows the full conversation", "#dc2626");
+    await showOverlay(bobPage, "👤 BOB — Activity feed shows the full conversation", "#dc2626");
     await pause(2500);
-    await page.evaluate(() =>
+    await bobPage.evaluate(() =>
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
     );
     await pause(1500);
 
+    await rec.stop();
+
     /* ============================================================== */
-    /*  SCENE 10 – Alice edits entity                                 */
+    /*  SCENE 8 – Alice edits entity (Alice's page)                   */
     /* ============================================================== */
-    console.log("  Scene 10: Alice edits entity");
+    console.log("  Scene 8: Alice edits entity");
+    sp = segPath();
+    rec = await alicePage.screencast({ path: sp });
+    segments.push(sp);
+
     await showSceneTitle(
-      page,
-      "Back to Alice's Perspective",
+      alicePage,
+      "Back to Alice",
       "Alice updates the entity based on Bob's feedback",
       2500
     );
 
-    await page.goto(frontendUrl, { waitUntil: "networkidle2" });
-    await showOverlay(page, "👤 ALICE's Screen", "#2563eb");
-    await clickButtonByText(page, "HCMIU Collaborative");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Entities")
-    );
-    await loginViaUI(page, aliceName, pw);
-    await pause(500);
-
-    await showOverlay(page, "👤 ALICE — Updating entity with Bob's info", "#2563eb");
+    await showOverlay(alicePage, "👤 ALICE — Updating entity with Bob's info", "#2563eb");
     await fetchJson(
       `/api/entities/${entityId}`,
       {
@@ -308,42 +307,41 @@ const run = async () => {
       },
       aliceCreds.token
     );
-    await showOverlay(page, "👤 ALICE — Entity updated! Followers notified ✓", "#16a34a");
+    await showOverlay(alicePage, "👤 ALICE — Entity updated! Followers notified ✓", "#16a34a");
     await pause(1500);
 
-    await clickButtonByText(page, "📰 Activity");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Activity Feed")
+    await clickButtonByText(alicePage, "📰 Activity");
+    await alicePage.waitForFunction(() =>
+      document.body.textContent?.includes("Activity Feed"),
+      { timeout: 15_000 }
     );
-    await showOverlay(page, "👤 ALICE — Complete collaboration history", "#2563eb");
+    await showOverlay(alicePage, "👤 ALICE — Complete collaboration history", "#2563eb");
     await pause(2500);
-    await page.evaluate(() =>
+    await alicePage.evaluate(() =>
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
     );
     await pause(1500);
-    await page.evaluate(() =>
+    await alicePage.evaluate(() =>
       window.scrollTo({ top: 0, behavior: "smooth" })
     );
     await pause(1000);
 
     /* ============================================================== */
-    /*  SCENE 11 – Outro                                              */
+    /*  SCENE 9 – Outro                                               */
     /* ============================================================== */
     await showSceneTitle(
-      page,
+      alicePage,
       "Demo Complete",
       "Multi-user real-time: entity creation, following, commenting, notifications",
       3000
     );
 
-    /* ---- Stop and convert ---- */
-    console.log("▶ Stopping screencast …");
-    await recorder.stop();
-    await browser.close();
-    console.log(`✔ WebM saved → ${webmPath}`);
+    await rec.stop();
 
-    convertToMp4(webmPath, mp4Path);
-    try { await unlink(webmPath); } catch {}
+    /* ---- Concatenate segments and convert ---- */
+    await browser.close();
+    console.log(`▶ Concatenating ${segments.length} segments …`);
+    await concatSegmentsToMp4(segments, mp4Path);
 
     console.log("\n🎬 Multi-user real-time demo complete!");
   } finally {

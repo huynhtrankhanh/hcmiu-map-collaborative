@@ -7,6 +7,8 @@
  *   • Viewing entity references
  *   • Degree-of-separation queries
  *
+ * Uses SEPARATE browser pages per user (no login/logout switching).
+ *
  * Usage:
  *   node backend/tests/demo-research-knowledge.test.mjs
  *
@@ -15,7 +17,7 @@
  */
 
 import path from "node:path";
-import { mkdir, unlink } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import {
   root, backendUrl, frontendUrl, artifactDir,
@@ -23,11 +25,11 @@ import {
   fetchJson, signup,
   launchBrowser, clickButtonByText, slowType, pause,
   showOverlay, hideOverlay, showSceneTitle,
-  convertToMp4, loginViaUI, waitForEntityByTitle,
+  concatSegmentsToMp4, loginViaUI, waitForEntityByTitle,
+  navigateToCollaborative,
 } from "./demo-helpers.mjs";
 
-const webmPath = path.join(artifactDir, "demo-research-knowledge.webm");
-const mp4Path  = path.join(artifactDir, "demo-research-knowledge.mp4");
+const mp4Path = path.join(artifactDir, "demo-research-knowledge.mp4");
 
 const run = async () => {
   composeUp();
@@ -105,83 +107,96 @@ const run = async () => {
 
     console.log("  Knowledge graph ready (5 entities, multiple references)");
 
-    /* ---- Browser ---- */
+    /* ---- Launch browser with TWO pages ---- */
     await mkdir(artifactDir, { recursive: true });
     const browser = await launchBrowser();
-    const page = await browser.newPage();
-    page.on("dialog", async (d) => d.accept());
 
-    console.log("▶ Starting screencast …");
-    const recorder = await page.screencast({ path: webmPath });
+    const researcherPage  = await browser.newPage();
+    const contributorPage = await browser.newPage();
+
+    researcherPage.on("dialog", async (d) => d.accept());
+    contributorPage.on("dialog", async (d) => d.accept());
+
+    /* ---- Setup: navigate both pages & log in once ---- */
+    console.log("▶ Setting up Researcher's page …");
+    await researcherPage.goto(frontendUrl, { waitUntil: "networkidle2" });
+    await navigateToCollaborative(researcherPage);
+    await loginViaUI(researcherPage, researcherName, pw);
+
+    console.log("▶ Setting up Contributor's page …");
+    await contributorPage.goto(frontendUrl, { waitUntil: "networkidle2" });
+    await navigateToCollaborative(contributorPage);
+    await loginViaUI(contributorPage, contributorName, pw);
+
+    console.log("✔ Both users logged in — starting demo");
+
+    /* Segment tracking */
+    const segments = [];
+    let segIdx = 0;
+    const segPath = () =>
+      path.join(artifactDir, `rk-seg-${String(segIdx++).padStart(2, "0")}.webm`);
 
     /* ============================================================== */
-    /*  SCENE 1 – Intro                                               */
+    /*  SCENE 1 – Intro (Researcher's page)                           */
     /* ============================================================== */
+    let sp = segPath();
+    let rec = await researcherPage.screencast({ path: sp });
+    segments.push(sp);
+
     console.log("  Scene 1: Intro");
-    await page.goto(frontendUrl, { waitUntil: "networkidle2" });
     await showSceneTitle(
-      page,
+      researcherPage,
       "🔎 Research & Knowledge Graph",
       "Full-text search, entity references, and degree of separation",
       3000
     );
 
     /* ============================================================== */
-    /*  SCENE 2 – Login                                               */
+    /*  SCENE 2 – View entities                                       */
     /* ============================================================== */
-    console.log("  Scene 2: Login");
-    await showOverlay(page, `👤 Researcher (${researcherName}) — Logging In`, "#2563eb");
-    await clickButtonByText(page, "HCMIU Collaborative");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Entities")
-    );
-    await loginViaUI(page, researcherName, pw);
-    await showOverlay(page, `👤 Researcher — Logged in ✓`, "#16a34a");
+    console.log("  Scene 2: View entities");
+    await showOverlay(researcherPage, `👤 Researcher — ${researcherName}`, "#2563eb");
     await pause(1000);
-
-    /* ============================================================== */
-    /*  SCENE 3 – View entities                                       */
-    /* ============================================================== */
-    console.log("  Scene 3: View entities");
-    await showOverlay(page, "📡 Viewing knowledge graph entities", "#2563eb");
-    await clickButtonByText(page, "📡 Entities");
+    await showOverlay(researcherPage, "📡 Viewing knowledge graph entities", "#2563eb");
+    await clickButtonByText(researcherPage, "📡 Entities");
     await pause(2000);
-    await page.evaluate(() =>
+    await researcherPage.evaluate(() =>
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
     );
     await pause(1500);
-    await page.evaluate(() =>
+    await researcherPage.evaluate(() =>
       window.scrollTo({ top: 0, behavior: "smooth" })
     );
     await pause(1000);
 
     /* ============================================================== */
-    /*  SCENE 4 – Full-text Search                                    */
+    /*  SCENE 3 – Full-text Search                                    */
     /* ============================================================== */
-    console.log("  Scene 4: Full-text search");
-    await showOverlay(page, "🔎 Research — Full-Text Search", "#7c3aed");
-    await clickButtonByText(page, "🔎 Research");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Deep Research")
+    console.log("  Scene 3: Full-text search");
+    await showOverlay(researcherPage, "🔎 Research — Full-Text Search", "#7c3aed");
+    await clickButtonByText(researcherPage, "🔎 Research");
+    await researcherPage.waitForFunction(() =>
+      document.body.textContent?.includes("Deep Research"),
+      { timeout: 15_000 }
     );
     await pause(1000);
 
     // Switch to fulltext tab
-    await page.evaluate(() => {
+    await researcherPage.evaluate(() => {
       const tab = document.querySelector('[data-research-tab="fulltext"]');
       if (tab) tab.click();
     });
     await pause(800);
 
     // Search for "solar"
-    const fulltextInput = await page.$("#fulltext-input");
+    const fulltextInput = await researcherPage.$("#fulltext-input");
     if (fulltextInput) {
-      await showOverlay(page, '🔎 Searching for "solar"', "#7c3aed");
-      await slowType(page, "#fulltext-input", "solar", 60);
+      await showOverlay(researcherPage, '🔎 Searching for "solar"', "#7c3aed");
+      await slowType(researcherPage, "#fulltext-input", "solar", 60);
       await pause(500);
 
       try {
-        await page.evaluate(() => {
+        await researcherPage.evaluate(() => {
           const btn = Array.from(document.querySelectorAll("button")).find(
             (b) => (b.textContent || "").toLowerCase().includes("search")
           );
@@ -189,19 +204,19 @@ const run = async () => {
         });
       } catch {}
       await pause(2500);
-      await showOverlay(page, '🔎 Found "Solar Panel Installation Report" ✓', "#16a34a");
+      await showOverlay(researcherPage, '🔎 Found "Solar Panel Installation Report" ✓', "#16a34a");
       await pause(2000);
 
       // Clear and search again
-      await page.evaluate(() => {
+      await researcherPage.evaluate(() => {
         const input = document.querySelector("#fulltext-input");
         if (input) input.value = "";
       });
-      await showOverlay(page, '🔎 Searching for "water"', "#7c3aed");
-      await slowType(page, "#fulltext-input", "water", 60);
+      await showOverlay(researcherPage, '🔎 Searching for "water"', "#7c3aed");
+      await slowType(researcherPage, "#fulltext-input", "water", 60);
       await pause(500);
       try {
-        await page.evaluate(() => {
+        await researcherPage.evaluate(() => {
           const btn = Array.from(document.querySelectorAll("button")).find(
             (b) => (b.textContent || "").toLowerCase().includes("search")
           );
@@ -209,111 +224,110 @@ const run = async () => {
         });
       } catch {}
       await pause(2500);
-      await showOverlay(page, '🔎 Found "Water Recycling System" ✓', "#16a34a");
+      await showOverlay(researcherPage, '🔎 Found "Water Recycling System" ✓', "#16a34a");
       await pause(2000);
     }
 
     /* ============================================================== */
-    /*  SCENE 5 – Entity References                                   */
+    /*  SCENE 4 – Entity References                                   */
     /* ============================================================== */
-    console.log("  Scene 5: References");
-    await showOverlay(page, "🔗 Research — Entity References", "#2563eb");
+    console.log("  Scene 4: References");
+    await showOverlay(researcherPage, "🔗 Research — Entity References", "#2563eb");
     await pause(800);
 
-    await page.evaluate(() => {
+    await researcherPage.evaluate(() => {
       const tab = document.querySelector('[data-research-tab="references"]');
       if (tab) tab.click();
     });
     await pause(1000);
 
-    await showOverlay(page, "🔗 Viewing entity reference connections", "#2563eb");
+    await showOverlay(researcherPage, "🔗 Viewing entity reference connections", "#2563eb");
     await pause(2000);
 
     /* ============================================================== */
-    /*  SCENE 6 – Degree of Separation                                */
+    /*  SCENE 5 – Degree of Separation                                */
     /* ============================================================== */
-    console.log("  Scene 6: Degree of separation");
-    await showOverlay(page, "🔢 Research — Degree of Separation", "#7c3aed");
+    console.log("  Scene 5: Degree of separation");
+    await showOverlay(researcherPage, "🔢 Research — Degree of Separation", "#7c3aed");
     await pause(800);
 
-    await page.evaluate(() => {
+    await researcherPage.evaluate(() => {
       const tab = document.querySelector('[data-research-tab="degree"]');
       if (tab) tab.click();
     });
     await pause(1500);
 
-    await showOverlay(page, "🔢 Finding path length in the knowledge graph", "#7c3aed");
+    await showOverlay(researcherPage, "🔢 Finding path length in the knowledge graph", "#7c3aed");
     await pause(2000);
 
     // Demonstrate via API
     try {
       const result = await fetchJson(`/api/research/degree?from=${id1}&to=${id4}`);
       const pathLen = result.path ? result.path.length - 1 : "N/A";
-      await showOverlay(page, `🔢 ${pathLen} degree(s) of separation found ✓`, "#16a34a");
+      await showOverlay(researcherPage, `🔢 ${pathLen} degree(s) of separation found ✓`, "#16a34a");
     } catch {
-      await showOverlay(page, "🔢 Degree of separation demonstrated", "#16a34a");
+      await showOverlay(researcherPage, "🔢 Degree of separation demonstrated", "#16a34a");
     }
     await pause(2500);
 
+    await rec.stop();
+
     /* ============================================================== */
-    /*  SCENE 7 – Contributor's perspective                           */
+    /*  SCENE 6 – Contributor's perspective                           */
     /* ============================================================== */
-    console.log("  Scene 7: Contributor perspective");
+    console.log("  Scene 6: Contributor perspective");
+    sp = segPath();
+    rec = await contributorPage.screencast({ path: sp });
+    segments.push(sp);
+
     await showSceneTitle(
-      page,
-      "Switching to Contributor's Perspective",
+      contributorPage,
+      "Contributor's Perspective",
       `${contributorName} also contributes to the knowledge graph`,
       2500
     );
 
-    await page.goto(frontendUrl, { waitUntil: "networkidle2" });
-    await showOverlay(page, `👤 CONTRIBUTOR (${contributorName})`, "#dc2626");
-    await clickButtonByText(page, "HCMIU Collaborative");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Entities")
-    );
-    await loginViaUI(page, contributorName, pw);
-    await pause(500);
+    await showOverlay(contributorPage, `👤 CONTRIBUTOR — ${contributorName}`, "#dc2626");
+    await pause(800);
 
-    await showOverlay(page, "👤 CONTRIBUTOR — Viewing shared knowledge graph", "#dc2626");
-    await clickButtonByText(page, "📡 Entities");
+    await showOverlay(contributorPage, "👤 CONTRIBUTOR — Viewing shared knowledge graph", "#dc2626");
+    await clickButtonByText(contributorPage, "📡 Entities");
     await pause(2000);
-    await page.evaluate(() =>
+    await contributorPage.evaluate(() =>
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
     );
     await pause(1500);
 
     // Activity feed
-    await showOverlay(page, "👤 CONTRIBUTOR — Activity shows all contributions", "#dc2626");
-    await clickButtonByText(page, "📰 Activity");
-    await page.waitForFunction(() =>
-      document.body.textContent?.includes("Activity Feed")
+    await showOverlay(contributorPage, "👤 CONTRIBUTOR — Activity shows all contributions", "#dc2626");
+    await clickButtonByText(contributorPage, "📰 Activity");
+    await contributorPage.waitForFunction(() =>
+      document.body.textContent?.includes("Activity Feed"),
+      { timeout: 15_000 }
     );
     await pause(2000);
-    await page.evaluate(() =>
+    await contributorPage.evaluate(() =>
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
     );
     await pause(1500);
 
     /* ============================================================== */
-    /*  SCENE 8 – Outro                                               */
+    /*  SCENE 7 – Outro                                               */
     /* ============================================================== */
-    console.log("  Scene 8: Outro");
+    console.log("  Scene 7: Outro");
     await showSceneTitle(
-      page,
+      contributorPage,
       "Demo Complete",
       "Full-text search, entity references, and knowledge graph traversal",
       3000
     );
 
-    /* ---- Stop and convert ---- */
-    console.log("▶ Stopping screencast …");
-    await recorder.stop();
-    await browser.close();
-    console.log(`✔ WebM saved → ${webmPath}`);
+    await rec.stop();
 
-    convertToMp4(webmPath, mp4Path);
-    try { await unlink(webmPath); } catch {}
+    /* ---- Concatenate segments and convert ---- */
+    await browser.close();
+    console.log(`▶ Concatenating ${segments.length} segments …`);
+    await concatSegmentsToMp4(segments, mp4Path);
 
     console.log("\n🎬 Research & knowledge graph demo complete!");
   } finally {
