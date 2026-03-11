@@ -16,6 +16,7 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{tabularx}
+\usepackage{microtype}
 
 \lstset{
   basicstyle=\ttfamily\small,
@@ -266,14 +267,24 @@ Relations:
 
 \subsection{Relational projection (3NF analysis)}
 Although deployed in ArangoDB's document model, an equivalent normalized relational schema illustrates the underlying data dependencies:
+{\footnotesize
 \begin{itemize}
-    \item \texttt{Users(\underline{user\_id}, username [UNIQUE], client\_salt, server\_salt, password\_hash, created\_at)}
-    \item \texttt{Entities(\underline{entity\_id}, type, title, body, parent\_entity\_id [FK$\to$Entities], created\_by [FK$\to$Users], created\_at)}
-    \item \texttt{EntityReferences(\underline{from\_entity\_id [FK], to\_entity\_id [FK]}, created\_at)}
-    \item \texttt{Follows(\underline{user\_id [FK], entity\_id [FK]}, created\_at)}
-    \item \texttt{Notifications(\underline{notification\_id}, user\_id [FK], entity\_id [FK], type, read, created\_at)}
-    \item \texttt{Trials(\underline{trial\_id}, entity\_id [FK], plaintiff\_id [FK], defendant\_id [FK], status, outcome, created\_at)}
+    \item \texttt{Users(\underline{user\_id}, username [UNIQUE],} \\
+      \texttt{client\_salt, server\_salt, password\_hash, created\_at)}
+    \item \texttt{Entities(\underline{entity\_id}, type, title, body,} \\
+      \texttt{parent\_entity\_id [FK$\to$Entities],} \\
+      \texttt{created\_by [FK$\to$Users], created\_at)}
+    \item \texttt{EntityReferences(\underline{from\_entity\_id [FK],} \\
+      \texttt{to\_entity\_id [FK]}, created\_at)}
+    \item \texttt{Follows(\underline{user\_id [FK],
+      entity\_id [FK]}, created\_at)}
+    \item \texttt{Notifications(\underline{notification\_id},} \\
+      \texttt{user\_id [FK], entity\_id [FK], type, read, created\_at)}
+    \item \texttt{Trials(\underline{trial\_id}, entity\_id [FK],} \\
+      \texttt{plaintiff\_id [FK], defendant\_id [FK], status, outcome,} \\
+      \texttt{created\_at)}
 \end{itemize}
+}
 This projection is in Third Normal Form (3NF): every non-key attribute depends on the whole key and nothing but the key. The \texttt{agreedJudges}, \texttt{votes}, and \texttt{judgeNegotiationHistory} fields, which are JSON arrays/objects in the document model, would require additional junction tables (\texttt{TrialJudges}, \texttt{TrialVotes}, \texttt{NegotiationHistory}) in a fully normalized relational schema.
 
 \section{Authentication architecture}
@@ -287,9 +298,19 @@ The system implements a two-phase, SRP-inspired (Secure Remote Password) authent
 \begin{enumerate}
     \item Client sends username to \texttt{POST /api/auth/signup/start}.
     \item Server generates two cryptographically random 16-byte salts (\texttt{clientSalt}, \texttt{serverSalt}) and returns them.
-    \item Client derives a 32-byte key from the password using Argon2id with \texttt{clientSalt}: \\ \texttt{clientHash = argon2id(password, clientSalt, OPSLIMIT\_INTERACTIVE, MEMLIMIT\_INTERACTIVE)}.
-    \item Client sends \texttt{(username, clientHash, clientSalt, serverSalt)} to \texttt{POST /api/auth/signup/finish}.
-    \item Server computes \texttt{passwordHash = SHA-256(clientHash || ":" || serverSalt)} and stores \texttt{(username, clientSalt, serverSalt, passwordHash)}.
+    \item Client derives a 32-byte key from the password using Argon2id with \texttt{clientSalt}:
+
+    {\footnotesize \texttt{clientHash = argon2id(password, clientSalt,
+      OPSLIMIT\_INTERACTIVE, MEMLIMIT\_INTERACTIVE)}}
+
+    \item Client sends \texttt{(username, clientHash, clientSalt, serverSalt)} to
+
+    \texttt{POST /api/auth/signup/finish}.
+    \item Server computes
+
+    {\small \texttt{passwordHash = SHA-256(clientHash || ":" || serverSalt)}}
+
+    and stores \texttt{(username, clientSalt, serverSalt, passwordHash)}.
 \end{enumerate}
 
 \textbf{Login flow:}
@@ -306,8 +327,8 @@ The system implements a two-phase, SRP-inspired (Secure Remote Password) authent
 \begin{itemize}
     \item \textbf{Password never transmitted:} Only the Argon2id-derived hash leaves the client, not the plaintext password.
     \item \textbf{Memory-hard key derivation:} Argon2id (the Argon2 variant resistant to both side-channel and GPU attacks) makes offline brute-force costly even with the \texttt{clientSalt}.
-    \item \textbf{Two-salt architecture:} The \texttt{clientSalt} protects against rainbow tables on the client-derived hash; the \texttt{serverSalt} adds a second layer so that compromising one salt is insufficient.
-    \item \textbf{Session tokens:} UUID-based bearer tokens stored in server memory; no JWT signature verification overhead, but tokens do not survive server restarts.
+    \item \textbf{Two-salt architecture:} The \texttt{client\-Salt} protects against rainbow tables on the client-derived hash; the \texttt{server\-Salt} adds a second layer so that compromising one salt is insufficient.
+    \item \textbf{Session tokens:} UUID-based bearer tokens stored in server memory; no JWT signature verification overhead, but tokens do not survive server~restarts.
 \end{itemize}
 
 \section{Real-time event system}
@@ -337,7 +358,9 @@ Broadcast events are fire-and-forget: the server does not wait for client acknow
 Data sources are mixed:
 \begin{itemize}
     \item \textbf{Static map metadata:} Extracted from TypeScript source files (\texttt{mapPointToConstructName.ts}) containing room and lift names for all seven floors. Each floor defines a mapping from numeric point indices to human-readable construct names (e.g., point~0 $\to$ ``O2.101'', point~55 $\to$ ``A1.109'').
-    \item \textbf{Automatic map entity provisioning:} At backend startup, the server iterates over all floors and construct names, generating deterministic entity IDs via \texttt{SHA-256(normalize(``Floor N: RoomName'')).slice(0, 24)}. For each location, an entity of type \texttt{map\_location} is created (or verified to exist) with appropriate title, body, and tags (\texttt{["map", "room-or-stairs"]}). This produces approximately 100+ stable map entities that serve as collaborative thread anchors.
+    \item \textbf{Automatic map entity provisioning:} At backend startup, the server iterates over all floors and construct names, generating deterministic entity IDs via
+    \texttt{SHA\nobreakdash-256(\allowbreak normalize("Floor~N:\allowbreak{} RoomName"))\allowbreak.slice(0,~24)}.
+    For each location, an entity of type \texttt{map\_location} is created (or verified to exist) with appropriate title, body, and tags (\texttt{["map",\allowbreak{} "room-or-stairs"]}). This produces approximately 100+ stable map entities that serve as collaborative thread anchors.
     \item \textbf{Synthetic interaction data:} Generated through UI interactions, API calls, and automated test scenarios. The API test suite creates users, posts, comments, references, follows, notifications, and trials to exercise the full entity lifecycle.
 \end{itemize}
 
@@ -345,7 +368,7 @@ Data sources are mixed:
 To support growth in entity and interaction volume, the data model is designed around predictable access paths:
 \begin{itemize}
     \item \textbf{Entity listing/filtering:} Primary access patterns include filtering by \texttt{type} and \texttt{parentEntityId} (for comment retrieval under a parent entity). Index candidates include composite indexes on \texttt{(type, createdAt)} and \texttt{(parentEntityId, createdAt)} for efficient sorted scans.
-    \item \textbf{Notification retrieval:} Inbox-like queries filter by \texttt{userId} and optionally by \texttt{read} status, then sort by \texttt{createdAt}. A composite index on \texttt{(userId, read, createdAt)} would support this pattern efficiently.
+    \item \textbf{Notification retrieval:} Inbox-like queries filter by \texttt{userId} and optionally by \texttt{read} status, then sort by \texttt{createdAt}. A composite index on \texttt{(userId,\allowbreak{} read,\allowbreak{} createdAt)} would support this pattern efficiently.
     \item \textbf{Edge traversals:} ArangoDB automatically indexes \texttt{\_from} and \texttt{\_to} attributes on edge collections, so traversal cost is primarily controlled by graph diameter and branching factor rather than collection size.
     \item \textbf{Map entity lookup:} The deterministic ID generation for map entities (\texttt{entity\_map\_<hash>}) enables O(1) document retrieval by \texttt{\_key} without requiring secondary indexes or fuzzy matching.
     \item \textbf{Full-text search:} The current substring-based search (\texttt{CONTAINS(LOWER(...))}) requires a full collection scan. For production workloads, this would be replaced by ArangoSearch views with inverted indexes for sub-linear lookup.
@@ -449,7 +472,8 @@ Each trial follows a three-phase lifecycle:
     \item A plaintiff creates a trial by specifying a defendant username.
     \item Either party can propose a list of judges via \texttt{POST /api/trials/:id/propose-judges}.
     \item Turn-taking is enforced: the \texttt{lastProposedBy} field prevents the same party from proposing twice consecutively.
-    \item The other party may counter-propose with a different judge list or accept the current proposal via \texttt{POST /api/trials/:id/accept-judges}.
+    \item The other party may counter-propose with a different judge list or accept the current proposal via the endpoint
+    \texttt{POST /api/trials/:id/\hspace{0pt}accept\hspace{0pt}-judges}.
     \item All proposals and acceptances are recorded in the \texttt{judgeNegotiationHistory} array for auditability.
     \item When one party accepts the other's proposal, the trial transitions to \texttt{active} status.
 \end{itemize}
@@ -536,7 +560,7 @@ System & \texttt{GET /api/activity} & Activity feed \\
 \subsection{Map data structure and rendering}
 The campus map covers seven floors, each represented as:
 \begin{itemize}
-    \item An HTML/CSS grid layout generated via Hyperscript, with clickable room elements carrying \texttt{data-constructname} and \texttt{data-isconstruct} attributes for programmatic interaction.
+    \item An HTML/CSS grid layout generated via Hyperscript, with clickable room elements carrying \texttt{data-construct\-name} and \texttt{data-is\-construct} attributes for programmatic interaction.
     \item A graph structure defined as an edge list (\texttt{[number, number][]}), where each number is a point index corresponding to a physical location.
     \item A coordinate array (\texttt{points[index] = [x, y]}) mapping point indices to pixel positions for path visualization.
     \item Rendering primitives (\texttt{mapPrimitives.ts}) for rooms, lifts, stairs, classrooms, and libraries.
@@ -628,9 +652,9 @@ These scenarios use Puppeteer~24's screencast API to record WebM video, which is
 
 \subsection{Database-level observations}
 \begin{itemize}
-    \item \textbf{Unified query language:} AQL's ability to combine document operations (\texttt{FOR ... FILTER ... RETURN}) with graph traversals (\texttt{SHORTEST\_PATH}, \texttt{TRAVERSE}) eliminates the need for application-level data stitching that would be required in a polyglot architecture.
-    \item \textbf{Edge synchronization:} The upsert pattern for reference edges (using \texttt{SHA-256} deterministic keys and \texttt{overwriteMode: "replace"}) ensures consistency between the entity's \texttt{references[]} array and the edge collection without requiring explicit transactions.
-    \item \textbf{Graph vs.\ relational expressiveness:} The degree-of-separation query is a single AQL statement (\texttt{ANY SHORTEST\_PATH}), compared with a recursive Common Table Expression (CTE) in SQL that would require explicit depth tracking, cycle detection, and termination conditions.
+    \item \textbf{Unified query language:} AQL's ability to combine document operations (\texttt{FOR ...\ FILTER ...\ RETURN}) with graph traversals (\texttt{SHORTEST\_PATH}, \texttt{TRAVERSE}) eliminates the need for application-level data stitching that would be required in a polyglot architecture.
+    \item \textbf{Edge synchronization:} The upsert pattern for reference edges (using SHA\nobreakdash-256 deterministic keys and \texttt{overwrite\-Mode: "replace"}) ensures consistency between the entity's \texttt{references[]} array and the edge collection without requiring explicit transactions.
+    \item \textbf{Graph vs.\ relational expressiveness:} The degree-of-separation query is a single AQL statement (\texttt{ANY SHORTEST\_\allowbreak PATH}), compared with a recursive Common Table Expression~(CTE) in SQL that would require explicit depth tracking, cycle detection, and termination~conditions.
     \item \textbf{Schema flexibility:} Adding the \texttt{judgeNegotiationHistory} array to trials and the \texttt{tags[]} array to entities required no schema migration---documents were simply written with the new fields, and existing documents continued to function with implicit \texttt{null} values.
     \item \textbf{Trade-off awareness:} The generic entity model accelerated feature delivery but required disciplined type checks at the application level to avoid semantic drift (e.g., treating a \texttt{map\_location} entity as a regular post).
 \end{itemize}
