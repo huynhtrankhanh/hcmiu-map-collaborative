@@ -90,7 +90,7 @@ export function ShortestPathForm(
           h("div.flex-grow.border-t.border-gray-300"),
           h("span.px-3.text-sm", "or"),
           h(
-            "button.bg-blue-500.text-white.px-4.py-1.rounded",
+            "button.bg-blue-700.text-white.px-4.py-1.rounded",
             {
               type: "button",
               onclick: () => {
@@ -111,7 +111,7 @@ export function ShortestPathForm(
           h("div.flex-grow.border-t.border-gray-300"),
           h("span.px-3.text-sm", "or"),
           h(
-            "button.bg-blue-500.text-white.px-4.py-1.rounded",
+            "button.bg-blue-700.text-white.px-4.py-1.rounded",
             {
               type: "button",
               onclick: () => {
@@ -124,7 +124,7 @@ export function ShortestPathForm(
       ),
       samePlacesError,
       h(
-        "button.bg-green-500.text-white.px-4.py-2.rounded.w-full",
+        "button.bg-green-700.text-white.px-4.py-2.rounded.w-full",
         { type: "submit" },
         "Find Path"
       )

@@ -153,7 +153,7 @@ const MapViewPage = (
       h(
         "div.flex.gap-2.mt-3.flex-wrap",
         h(
-          "button.bg-blue-500.text-white.px-3.py-2.rounded",
+          "button.bg-blue-700.text-white.px-3.py-2.rounded",
           {
             onclick: () => {
               if (selectedConstruct && mapViewApi?.focusConstruct) {
@@ -173,7 +173,7 @@ const MapViewPage = (
           "Reset zoom"
         ),
         h(
-          "button.bg-green-600.text-white.px-3.py-2.rounded",
+          "button.bg-green-700.text-white.px-3.py-2.rounded",
           {
             onclick: async () => {
               if (!selectedConstruct) return;
@@ -218,7 +218,7 @@ const MapViewPage = (
                 h("h3.font-semibold.mb-2", "Comments"),
                 h("ul.text-sm.list-disc.pl-5.max-h-56.overflow-auto.bg-white/50.p-2.rounded", commentNodes),
                 h(
-                  "button.bg-green-600.text-white.px-3.py-2.rounded.w-full.mt-3",
+                  "button.bg-green-700.text-white.px-3.py-2.rounded.w-full.mt-3",
                   {
                     onclick: () => {
                       if (onOpenCollaborative && mapEntity) {
@@ -237,7 +237,7 @@ const MapViewPage = (
 
     const toolbar = h("div.flex.flex-wrap.gap-2.mt-2",
       h(
-        "button.bg-red-500.text-white.px-4.py-2.rounded",
+        "button.bg-red-700.text-white.px-4.py-2.rounded",
         {
           onclick: () => {
             if (onExit !== undefined) onExit();
@@ -314,7 +314,7 @@ const ShortestPathPage = (onExit?: () => void) => {
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full.max-w-md",
             PageIntro("🧭", "Shortest Path Planner", "Set source and destination, then compute the most efficient route."),
             h(
-              "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
+              "button.bg-red-700.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
                 onclick: () => {
                   if (onExit !== undefined) {
@@ -336,7 +336,7 @@ const ShortestPathPage = (onExit?: () => void) => {
         let currentlyChosen: string | undefined;
 
         const cancelButton = h(
-          "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mt-3",
+          "button.bg-red-700.text-white.px-4.py-2.rounded.w-full.mt-3",
           {
             onclick: () => {
               currentStage = "form";
@@ -347,7 +347,7 @@ const ShortestPathPage = (onExit?: () => void) => {
         );
 
         const confirmButton = h(
-          "button.bg-blue-500.text-white.px-4.py-2.rounded.w-full",
+          "button.bg-blue-700.text-white.px-4.py-2.rounded.w-full",
           { style: "display:none" },
           {
             onclick: () => {
@@ -468,7 +468,7 @@ const ShortestPathPage = (onExit?: () => void) => {
               )
             ),
             h(
-              "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
+              "button.bg-red-700.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
                 onclick: () => {
                   if (onExit !== undefined) onExit();
@@ -526,7 +526,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
             "div.bg-white.p-8.rounded-lg.shadow-md.w-full.max-w-md",
             PageIntro("📍", "Traveling Salesman Optimizer", "Add multiple destinations and generate an efficient visit order."),
             h(
-              "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
+              "button.bg-red-700.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
                 onclick: () => {
                   travelingSalesman.cleanup();
@@ -543,7 +543,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
               h(
                 "div.flex.flex-wrap.gap-2",
                 h(
-                  "button.bg-blue-500.text-white.px-3.py-2.rounded.text-xs",
+                  "button.bg-blue-700.text-white.px-3.py-2.rounded.text-xs",
                   {
                     onclick: () => {
                       travelingSalesman.cleanup();
@@ -562,7 +562,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
                   "Load classroom loop"
                 ),
                 h(
-                  "button.bg-green-600.text-white.px-3.py-2.rounded.text-xs",
+                  "button.bg-green-700.text-white.px-3.py-2.rounded.text-xs",
                   {
                     onclick: () => {
                       travelingSalesman.cleanup();
@@ -592,7 +592,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
         let currentlyChosen: string | undefined;
 
         const cancelButton = h(
-          "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mt-3",
+          "button.bg-red-700.text-white.px-4.py-2.rounded.w-full.mt-3",
           {
             onclick: () => {
               currentStage = { type: "form" };
@@ -608,7 +608,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
         )!;
 
         const confirmButton = h(
-          "button.bg-blue-500.text-white.px-4.py-2.rounded.w-full",
+          "button.bg-blue-700.text-white.px-4.py-2.rounded.w-full",
           { style: "display:none" },
           {
             onclick: () => {
@@ -752,7 +752,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
               )
             ),
             h(
-              "button.bg-red-500.text-white.px-4.py-2.rounded.w-full.mb-3",
+              "button.bg-red-700.text-white.px-4.py-2.rounded.w-full.mb-3",
               {
                 onclick: () => {
                   if (onExit !== undefined) onExit();
@@ -797,7 +797,7 @@ const TravelingSalesmanPage = (onExit?: () => void) => {
                 "Contact the Cartographers team of the Data Structures and Algorithms course to buy HCMIU Map Pro."
               ),
               h(
-                "button.bg-blue-500.text-white.px-4.py-2.rounded.w-full.mt-3",
+                "button.bg-blue-700.text-white.px-4.py-2.rounded.w-full.mt-3",
                 {
                   onclick: () => {
                     currentStage = { type: "form" };
@@ -830,7 +830,7 @@ const LandingPage = (
       icon: "🗺️",
       title: "View Map",
       subtitle: "Explore floors, rooms, gates, and key facilities at a glance.",
-      className: "bg-blue-500",
+      className: "bg-blue-700",
       onClick: () => {
         if (onClickViewMap !== undefined) onClickViewMap();
       },
@@ -839,7 +839,7 @@ const LandingPage = (
       icon: "🧭",
       title: "Find Shortest Path",
       subtitle: "Compute the quickest route between two places across floors.",
-      className: "bg-blue-500",
+      className: "bg-blue-700",
       onClick: () => {
         if (onClickFindShortestPath !== undefined) onClickFindShortestPath();
       },
@@ -848,7 +848,7 @@ const LandingPage = (
       icon: "📍",
       title: "Solve Traveling Salesman",
       subtitle: "Optimize multi-stop routes with smart path ordering.",
-      className: "bg-blue-500",
+      className: "bg-blue-700",
       onClick: () => {
         if (onClickSolveTravelingSalesman !== undefined) onClickSolveTravelingSalesman();
       },
@@ -857,7 +857,7 @@ const LandingPage = (
       icon: "🤝",
       title: "HCMIU Collaborative",
       subtitle: "Open community-powered discussions tied directly to map entities.",
-      className: "bg-green-600",
+      className: "bg-green-700",
       onClick: () => {
         if (onClickCollaborative !== undefined) onClickCollaborative();
       },
@@ -953,7 +953,7 @@ const LandingPage = (
           )
         ),
         h(
-          "button.bg-blue-500.text-white.px-5.py-4.w-full.mt-4.text-left",
+          "button.bg-blue-700.text-white.px-5.py-4.w-full.mt-4.text-left",
           {
             onclick: () => {
               window.open("https://github.com/huynhtrankhanh/hcmiu-map", "_blank", "noreferrer");

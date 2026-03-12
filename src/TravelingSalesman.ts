@@ -55,7 +55,7 @@ export function TravelingSalesman(
           "Delete"
         ),
         h(
-          "button.bg-blue-500.text-white.px-4.py-1.rounded",
+          "button.bg-blue-700.text-white.px-4.py-1.rounded",
           {
             type: "button",
             onclick: () => {
@@ -89,7 +89,7 @@ export function TravelingSalesman(
   );
 
   const findPathButton = h(
-    "button.bg-green-500.text-white.px-4.py-2.rounded.w-full",
+    "button.bg-green-700.text-white.px-4.py-2.rounded.w-full",
     { type: "submit" },
     "Find Path"
   );
