@@ -114,6 +114,10 @@ class ArangoStore {
     const cursor = await this.db.query(`FOR f IN follows FILTER f.entityId == @entityId RETURN f`, { entityId });
     return await cursor.all();
   }
+  async listUserFollows(userId) {
+    const cursor = await this.db.query(`FOR f IN follows FILTER f.userId == @userId RETURN f.entityId`, { userId });
+    return await cursor.all();
+  }
   async createNotification(notification) {
     await this.db.collection("notifications").save({ _key: notification.id, ...notification });
   }
@@ -390,14 +394,20 @@ export async function createServer(options = {}) {
     sendWs({ type: "entity.created", entity });
 
     if (entity.parentEntityId) {
+      const parentEntity = await store.getEntity(entity.parentEntityId);
       const followers = await store.listFollowers(entity.parentEntityId);
       for (const follower of followers) {
         if (follower.userId === req.user.id) continue;
+        const parentTitle = parentEntity?.title || "(untitled)";
         const notification = {
           id: toEntityId("notif"),
           userId: follower.userId,
           entityId: entity.parentEntityId,
-          message: `${req.user.username} commented on an entity you follow`,
+          entityTitle: parentTitle,
+          entityType: parentEntity?.type || "entity",
+          commentBody: entity.body ? entity.body.slice(0, 200) : "",
+          commenterUsername: req.user.username,
+          message: `${req.user.username} commented on "${parentTitle}": ${entity.body ? entity.body.slice(0, 100) : "(no content)"}`,
           read: false,
           createdAt: new Date().toISOString(),
         };
@@ -421,6 +431,11 @@ export async function createServer(options = {}) {
     if (!entity) return res.status(404).json({ error: "entity not found" });
     await store.unfollowEntity(req.user.id, entity.id);
     res.status(204).end();
+  });
+
+  app.get("/api/user/follows", auth, async (req, res) => {
+    const entityIds = await store.listUserFollows(req.user.id);
+    res.json({ entityIds });
   });
 
   app.patch("/api/entities/:id", auth, async (req, res) => {
