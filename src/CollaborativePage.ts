@@ -81,7 +81,8 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
   let trials: any[] = [];
   let notifications: any[] = [];
   let activityItems: any[] = [];
-  let followedEntityIds: Set<string> = new Set();  let ws: WebSocket | null = null;
+  let followedEntityIds: Set<string> = new Set();
+  let ws: WebSocket | null = null;
   type ResearchResult =
     | { type: "references" | "fulltext"; data: { entities: any[] } }
     | { type: "degree"; data: { path: string[]; entities: any[] } }
@@ -939,6 +940,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         currentSubPage = "entities";
         render();
         setTimeout(() => {
+          // Only one of follow/unfollow buttons exists per entity based on follow state
           const entityEl = panel.querySelector(`[data-follow="${entityId}"], [data-unfollow="${entityId}"]`);
           if (entityEl) {
             const card = entityEl.closest(".border.rounded.p-3");
