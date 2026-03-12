@@ -418,7 +418,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
           <input id="password" type="password" class="border p-2 w-full mb-2" placeholder="Password" />
           <div class="flex gap-2">
             <button id="signup" class="bg-blue-600 text-white px-3 py-2 rounded w-full">Sign up</button>
-            <button id="login" class="bg-blue-500 text-white px-3 py-2 rounded w-full">Log in</button>
+            <button id="login" class="bg-blue-700 text-white px-3 py-2 rounded w-full">Log in</button>
           </div>
         `;
         break;
@@ -439,8 +439,8 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
                 <div class="text-sm">${escapeHtml(entity.body || "")}</div>
                 <div class="text-xs text-gray-600">id: ${escapeHtml(entity.id)}</div>
                 <div class="text-xs text-gray-600">refs: ${(entity.references || []).map((r: string) => escapeHtml(r)).join(", ") || "none"}</div>
-                ${token ? `<div class="flex gap-2 flex-wrap mt-2">${followedEntityIds.has(entity.id) ? `<button data-unfollow="${escapeHtml(entity.id)}" class="bg-gray-600 text-white px-2 py-1 rounded">Unfollow</button>` : `<button data-follow="${escapeHtml(entity.id)}" class="bg-blue-500 text-white px-2 py-1 rounded">Follow</button>`}<button data-research-one="${escapeHtml(entity.id)}" class="bg-slate-700 text-white px-2 py-1 rounded">Find references</button>${mine ? `<button data-edit="${escapeHtml(entity.id)}" class="bg-yellow-600 text-white px-2 py-1 rounded">Edit</button><button data-delete="${escapeHtml(entity.id)}" class="bg-red-700 text-white px-2 py-1 rounded">Delete</button>` : ""}</div>` : ""}
-                ${token ? `<div class="mt-2"><input data-comment-input="${escapeHtml(entity.id)}" class="border p-1 w-full" placeholder="Comment" /><button data-comment="${escapeHtml(entity.id)}" class="bg-green-600 text-white px-2 py-1 rounded mt-1">Comment</button></div>` : ""}
+                ${token ? `<div class="flex gap-2 flex-wrap mt-2">${followedEntityIds.has(entity.id) ? `<button data-unfollow="${escapeHtml(entity.id)}" class="bg-gray-600 text-white px-2 py-1 rounded">Unfollow</button>` : `<button data-follow="${escapeHtml(entity.id)}" class="bg-blue-700 text-white px-2 py-1 rounded">Follow</button>`}<button data-research-one="${escapeHtml(entity.id)}" class="bg-slate-700 text-white px-2 py-1 rounded">Find references</button>${mine ? `<button data-edit="${escapeHtml(entity.id)}" class="bg-amber-700 text-white px-2 py-1 rounded">Edit</button><button data-delete="${escapeHtml(entity.id)}" class="bg-red-700 text-white px-2 py-1 rounded">Delete</button>` : ""}</div>` : ""}
+                ${token ? `<div class="mt-2"><input data-comment-input="${escapeHtml(entity.id)}" class="border p-1 w-full" placeholder="Comment" /><button data-comment="${escapeHtml(entity.id)}" class="bg-green-700 text-white px-2 py-1 rounded mt-1">Comment</button></div>` : ""}
                 <ul class="text-sm list-disc pl-5 mt-2">${commentsMarkup}</ul>
               </div>
             `;
@@ -468,7 +468,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
                 <div class="flex gap-1 mt-1"><input id="ref-search-expert" class="border p-1 flex-1 text-xs" placeholder="Entity IDs (comma-separated)" /><button id="ref-search-expert-add" class="bg-gray-500 text-white px-2 py-1 rounded text-xs">Add</button></div>
               </details>
             </div>
-            <button id="create-entity" class="bg-green-600 text-white px-3 py-2 rounded w-full">Create</button>
+            <button id="create-entity" class="bg-green-700 text-white px-3 py-2 rounded w-full">Create</button>
           </section>
           ` : ""}
           <div style="max-height:60vh; overflow:auto; padding-right:0.5rem;">
@@ -494,7 +494,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
               return `<div class="text-xs text-blue-700">📋 Proposed by ${escapeHtml(userLabel(entry.proposedBy))} at ${escapeHtml(entry.timestamp)}: ${(entry.judges || []).map((j: string) => escapeHtml(userLabel(j))).join(", ")}</div>`;
             }).join("");
             const lastProposalInfo = trial.lastProposedBy
-              ? `<div class="text-xs text-orange-600 mt-1">Last proposal by: ${escapeHtml(userLabel(trial.lastProposedBy))} — Judges: ${renderJudgeList(trial.lastProposedJudges)}</div>`
+              ? `<div class="text-xs text-orange-700 mt-1">Last proposal by: ${escapeHtml(userLabel(trial.lastProposedBy))} — Judges: ${renderJudgeList(trial.lastProposedJudges)}</div>`
               : "";
             const canAccept = (() => {
               if (!token || trial.status !== "pending_agreement") return false;
@@ -518,7 +518,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
                 <div class="text-xs">agreed judges: ${renderJudgeList(trial.agreedJudges) || "none"}</div>
                 ${lastProposalInfo}
                 ${historyHtml ? `<details class="mt-1"><summary class="text-xs cursor-pointer text-gray-500">Negotiation history</summary><div class="mt-1">${historyHtml}</div></details>` : ""}
-                ${canAccept ? `<button data-accept-judges="${escapeHtml(trial.id)}" class="bg-green-600 text-white px-2 py-1 rounded mt-2">Accept Judges</button>` : ""}
+                ${canAccept ? `<button data-accept-judges="${escapeHtml(trial.id)}" class="bg-green-700 text-white px-2 py-1 rounded mt-2">Accept Judges</button>` : ""}
                 ${canPropose ? `<div class="mt-2"><input data-judges-input="${escapeHtml(trial.id)}" class="border p-1 w-full" placeholder="Judge usernames (comma-separated)" /><button data-judges="${escapeHtml(trial.id)}" class="bg-indigo-600 text-white px-2 py-1 rounded mt-1">${trial.lastProposedBy ? "Counter-propose Judges" : "Propose Judges"}</button></div>` : ""}
                 ${canVote ? `<div class="mt-2"><select data-vote-input="${escapeHtml(trial.id)}" class="border p-1 w-full"><option value="plaintiff">plaintiff</option><option value="defendant">defendant</option><option value="no_winner">no_winner</option></select><button data-vote="${escapeHtml(trial.id)}" class="bg-purple-600 text-white px-2 py-1 rounded mt-1">Vote</button></div>` : ""}
                 ${token ? `<div class="mt-2"><input data-trial-comment-input="${escapeHtml(trial.entityId)}" class="border p-1 w-full" placeholder="Trial comment" /><button data-trial-comment="${escapeHtml(trial.entityId)}" class="bg-green-700 text-white px-2 py-1 rounded mt-1">Comment on Trial</button></div>` : ""}
@@ -535,7 +535,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             <input id="trial-title" class="border p-2 w-full mb-2" placeholder="Trial title" />
             <input id="trial-defendant" class="border p-2 w-full mb-2" placeholder="Defendant username" />
             <textarea id="trial-description" class="border p-2 w-full mb-2" placeholder="Trial description"></textarea>
-            <button id="create-trial" class="bg-amber-600 text-white px-3 py-2 rounded">Create Trial</button>
+            <button id="create-trial" class="bg-amber-700 text-white px-3 py-2 rounded">Create Trial</button>
           </section>
           ` : ""}
           <p class="text-sm text-gray-600 mb-3">Judge agreement is an interactive dialogue: one party proposes judges, then the other can accept or counter-propose, and so on until agreement is reached.</p>
@@ -722,7 +722,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
     }
 
     panel.innerHTML = `
-      <button id="exit-btn" class="bg-red-500 text-white px-4 py-2 rounded w-full mb-3">Exit</button>
+      <button id="exit-btn" class="bg-red-700 text-white px-4 py-2 rounded w-full mb-3">Exit</button>
       ${haloHtml}
       <div class="flex flex-wrap gap-2 mb-4">${navHtml}</div>
       <div id="collab-content">${contentHtml}</div>

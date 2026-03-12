@@ -79,33 +79,40 @@ body {
 .bg-slate-700,
 .bg-yellow-600,
 .bg-amber-600 {
-  background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   border: none;
   border-radius: 12px;
-  color: #0b1224;
-  box-shadow: 0 12px 40px rgba(34, 211, 238, 0.35);
+  color: #ffffff;
+  box-shadow: 0 12px 40px rgba(37, 99, 235, 0.35);
 }
 
 .bg-red-500,
 .bg-red-700 {
-  background: linear-gradient(135deg, #f97316, #ef4444);
-  color: #0b1224;
-  box-shadow: 0 12px 40px rgba(249, 115, 22, 0.35);
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+  color: #ffffff;
+  box-shadow: 0 12px 40px rgba(153, 27, 27, 0.35);
 }
 
 .bg-green-600,
 .bg-green-500,
 .bg-green-700 {
-  background: linear-gradient(135deg, #34d399, #10b981);
-  color: #0b1224;
-  box-shadow: 0 12px 40px rgba(52, 211, 153, 0.35);
+  background: linear-gradient(135deg, #166534, #15803d);
+  color: #ffffff;
+  box-shadow: 0 12px 40px rgba(21, 128, 61, 0.35);
 }
 
 .bg-gray-500,
 .bg-gray-600,
 .bg-slate-700 {
-  background: linear-gradient(135deg, #94a3b8, #64748b);
-  color: #0b1224;
+  background: linear-gradient(135deg, #475569, #334155);
+  color: #ffffff;
+}
+
+.bg-yellow-600,
+.bg-amber-600 {
+  background: linear-gradient(135deg, #92400e, #78350f);
+  color: #ffffff;
+  box-shadow: 0 12px 40px rgba(146, 64, 14, 0.35);
 }
 
 .bg-blue-100,

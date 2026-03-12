@@ -22,7 +22,7 @@ function MainComponent({
           key={item}
           className={`px-6 py-4 flex items-center cursor-pointer ${
             selectedItem === index
-              ? "bg-blue-500 text-white"
+              ? "bg-blue-700 text-white"
               : "bg-white text-gray-900"
           }`}
           onClick={() => {
@@ -38,7 +38,7 @@ function MainComponent({
   );
   const selectedItemList = selectedItem !== null && (
     <ul className="divide-y divide-gray-200">
-      <li className="px-6 py-4 flex items-center bg-blue-500 text-white">
+      <li className="px-6 py-4 flex items-center bg-blue-700 text-white">
         <span className="mr-4 font-semibold">{selectedItem + 1}.</span>
         <span>{items[selectedItem]}</span>
       </li>
