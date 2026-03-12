@@ -189,17 +189,19 @@ const run = async () => {
     await pause(800);
 
     // Search for "solar"
-    const fulltextInput = await researcherPage.$("#fulltext-input");
+    const fulltextInput = await researcherPage.$("#research-fulltext");
     if (fulltextInput) {
       await showOverlay(researcherPage, '🔎 Searching for "solar"', "#7c3aed");
-      await slowType(researcherPage, "#fulltext-input", "solar", 60);
+      await slowType(researcherPage, "#research-fulltext", "solar", 60);
       await pause(500);
 
       try {
         await researcherPage.evaluate(() => {
-          const btn = Array.from(document.querySelectorAll("button")).find(
-            (b) => (b.textContent || "").toLowerCase().includes("search")
-          );
+          const btn =
+            document.querySelector("#research-fulltext-btn") ||
+            Array.from(document.querySelectorAll("button")).find(
+              (b) => (b.textContent || "").toLowerCase().includes("search")
+            );
           if (btn) btn.click();
         });
       } catch {}
@@ -209,17 +211,19 @@ const run = async () => {
 
       // Clear and search again
       await researcherPage.evaluate(() => {
-        const input = document.querySelector("#fulltext-input");
+        const input = document.querySelector("#research-fulltext");
         if (input) input.value = "";
       });
       await showOverlay(researcherPage, '🔎 Searching for "water"', "#7c3aed");
-      await slowType(researcherPage, "#fulltext-input", "water", 60);
+      await slowType(researcherPage, "#research-fulltext", "water", 60);
       await pause(500);
       try {
         await researcherPage.evaluate(() => {
-          const btn = Array.from(document.querySelectorAll("button")).find(
-            (b) => (b.textContent || "").toLowerCase().includes("search")
-          );
+          const btn =
+            document.querySelector("#research-fulltext-btn") ||
+            Array.from(document.querySelectorAll("button")).find(
+              (b) => (b.textContent || "").toLowerCase().includes("search")
+            );
           if (btn) btn.click();
         });
       } catch {}
