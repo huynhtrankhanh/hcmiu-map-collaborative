@@ -2,10 +2,11 @@ import { spawnSync } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer";
 import sodium from "libsodium-wrappers-sumo";
 
-const root = "/home/runner/work/hcmiu-map-collaborative/hcmiu-map-collaborative";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const backendUrl = "http://localhost:3000";
 const frontendUrl = backendUrl;
 const screenshotDir = path.join(root, "artifacts", "screenshots");

@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import sodium from "libsodium-wrappers-sumo";
 import { createServer } from "../server.mjs";
 
-const root = "/home/runner/work/hcmiu-map-collaborative/hcmiu-map-collaborative";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 const runCommand = (args) => {
   const result = spawnSync("docker", args, {
