@@ -240,3 +240,5 @@ Entity references can be added by searching for entities (instead of manually ty
 - API: `npm run test:api`
 - Puppeteer E2E (production-like): `npm run test:e2e`  
   This test spins up the full Docker Compose stack (`arangodb`, `backend`, `frontend`) before running browser automation.
+- Backend stress benchmark: `npm run test:stress-backend`  
+  This benchmark also targets the Docker Compose stack and refreshes the markdown report + SVG charts in `docs/benchmarks/`.

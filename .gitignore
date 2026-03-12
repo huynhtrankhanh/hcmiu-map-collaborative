@@ -2,6 +2,7 @@ node_modules
 dist
 artifacts/screenshots
 artifacts/*.webm
+artifacts/benchmarks
 report/*.aux
 report/*.bbl
 report/*.blg
