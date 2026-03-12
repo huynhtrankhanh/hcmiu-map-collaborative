@@ -1,0 +1,529 @@
+% ============================================================
+%  HCMIU Map Collaborative — Beamer Presentation (Slides Only)
+%  This version has no presenter notes — for projection use.
+%  For the version with notes, see main.tex.
+% ============================================================
+\documentclass[aspectratio=169,11pt]{beamer}
+
+% ---------- Theme & colours ----------
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+% ---------- Packages ----------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% ---------- Graphics path ----------
+\graphicspath{{../docs/screenshots/}}
+
+% ---------- Listings style ----------
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  keywordstyle=\color{blue!70!black},
+  commentstyle=\color{green!50!black},
+  showstringspaces=false
+}
+
+% ---------- Metadata ----------
+\title[HCMIU Map Collaborative]{%
+  HCMIU Map Collaborative\\[4pt]
+  \small A Multi-Model Database-Driven Campus Map\\
+  with Real-Time Collaboration}
+\author{Huynh Tran Khanh \\ \small Student ID: MITIU25210}
+\institute{%
+  Advanced Database System (IT502IU)\\
+  International University --- VNU-HCM}
+\date{\today}
+
+% ============================================================
+\begin{document}
+
+% --------------------------------------------------
+% SLIDE 1: Title
+% --------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 2: Outline
+% --------------------------------------------------
+\begin{frame}{Outline}
+  \tableofcontents
+\end{frame}
+
+% ============================================================
+\section{Introduction \& Motivation}
+% ============================================================
+
+% --------------------------------------------------
+% SLIDE 3: Problem Context
+% --------------------------------------------------
+\begin{frame}{Problem Context}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \textbf{Challenge:} Campus information systems must handle
+      \begin{itemize}
+        \item \textbf{High schema variability} --- rooms, notes, comments,
+              trials, moderation records evolve over time
+        \item \textbf{High relationship density} --- references, follows,
+              replies, dispute participants form a dense graph
+      \end{itemize}
+      \vspace{0.5em}
+      \textbf{Traditional approach:}
+      Polyglot persistence (separate document store + graph DB)
+      $\Rightarrow$ operational overhead, synchronisation burden
+      \cite{stonebraker2005onesize, sadalage2012nosql}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{block}{Our Approach}
+        Use \textbf{ArangoDB}---a single multi-model engine that
+        natively supports documents, graphs, and key-value
+        workloads---to reduce impedance mismatch while keeping
+        full graph query power.
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 4: Project Objectives
+% --------------------------------------------------
+\begin{frame}{Project Objectives}
+  \begin{enumerate}
+    \item \textbf{Interactive campus navigation} ---
+          7-floor indoor map with BFS shortest-path and
+          Traveling Salesman (Held--Karp) multi-stop optimiser
+    \item \textbf{Collaborative knowledge graph} ---
+          entity-based discussions with cross-references,
+          follows, notifications, and an activity feed
+    \item \textbf{Transparent dispute resolution} ---
+          a structured ``Court of Justice'' trial system
+          with judge negotiation and voting
+    \item \textbf{Graph-native research tools} ---
+          reference discovery, full-text search,
+          degree-of-separation queries
+    \item \textbf{Real-time experience} ---
+          WebSocket event propagation for live updates
+  \end{enumerate}
+\end{frame}
+
+% ============================================================
+\section{System Architecture}
+% ============================================================
+
+% --------------------------------------------------
+% SLIDE 5: Architecture Overview
+% --------------------------------------------------
+\begin{frame}{System Architecture}
+  \begin{center}
+    \begin{tikzpicture}[
+      box/.style={draw, rounded corners, minimum width=3cm,
+                  minimum height=1cm, align=center, font=\small},
+      arr/.style={->, thick, >=stealth}
+    ]
+      % Frontend
+      \node[box, fill=blue!15] (fe) at (0,0)
+        {Frontend\\{\scriptsize TypeScript + Vite + Tailwind}};
+      % Backend
+      \node[box, fill=green!15] (be) at (6,0)
+        {Backend\\{\scriptsize Node.js + Express 5}};
+      % Database
+      \node[box, fill=orange!15] (db) at (12,0)
+        {ArangoDB 3.11\\{\scriptsize Documents + Graphs}};
+      % WebSocket
+      \node[box, fill=purple!15] (ws) at (6,-2.2)
+        {WebSocket Server\\{\scriptsize Real-time events}};
+
+      \draw[arr] (fe) -- node[above]{\scriptsize REST API} (be);
+      \draw[arr] (be) -- node[above]{\scriptsize AQL} (db);
+      \draw[arr, <->] (fe) |- (ws);
+      \draw[arr] (be) -- (ws);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.5em}
+  \begin{itemize}
+    \item \textbf{Deployment:} Docker Compose (3 services: DB, backend, frontend)
+    \item \textbf{Frontend:} Hyperscript DOM library + Tailwind CSS + Anime.js
+    \item \textbf{Auth:} Client-side Argon2i (libsodium) $\rightarrow$ server SHA-256
+  \end{itemize}
+\end{frame}
+
+% ============================================================
+\section{Database Design}
+% ============================================================
+
+% --------------------------------------------------
+% SLIDE 6: Data Model
+% --------------------------------------------------
+\begin{frame}{Multi-Model Database Design}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Document Collections:}
+      \begin{itemize}
+        \item \texttt{users} --- credentials, salts, tokens
+        \item \texttt{entities} --- posts, comments, map locations, trial entities
+        \item \texttt{follows} --- user $\rightarrow$ entity subscriptions
+        \item \texttt{notifications} --- per-user alerts
+        \item \texttt{trials} --- court cases with status, judges, votes
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Edge Collection:}
+      \begin{itemize}
+        \item \texttt{entity\_references} --- directed edges
+              connecting entities that reference each other
+      \end{itemize}
+      \vspace{0.5em}
+      \begin{block}{Why Multi-Model?}
+        \begin{itemize}
+          \item Document storage for flexible schema evolution
+          \item Graph edges for relationship traversal
+          \item Single AQL query language for both
+          \item No cross-system synchronisation needed
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 7: Key AQL Queries
+% --------------------------------------------------
+\begin{frame}[fragile]{Representative AQL Queries}
+  \textbf{1. Reference Discovery (Graph Traversal):}
+  \begin{lstlisting}[language=SQL]
+FOR v, e IN 1..1 OUTBOUND @entityId entity_references
+  RETURN { entity: v, edge: e }
+  \end{lstlisting}
+  \vspace{0.3em}
+  \textbf{2. Degree of Separation (Shortest Path):}
+  \begin{lstlisting}[language=SQL]
+FOR v IN OUTBOUND SHORTEST_PATH
+  @fromId TO @toId entity_references
+  RETURN v
+  \end{lstlisting}
+  \vspace{0.3em}
+  \textbf{3. Full-Text Search:}
+  \begin{lstlisting}[language=SQL]
+FOR e IN entities
+  FILTER CONTAINS(LOWER(e.title), LOWER(@query))
+      OR CONTAINS(LOWER(e.body), LOWER(@query))
+  RETURN e
+  \end{lstlisting}
+\end{frame}
+
+% ============================================================
+\section{Feature Walkthrough}
+% ============================================================
+
+% --------------------------------------------------
+% SLIDE 8: Landing Page
+% --------------------------------------------------
+\begin{frame}{Landing Page}
+  \begin{center}
+    \includegraphics[width=0.72\textwidth]{landing-page.png}
+  \end{center}
+  \vspace{-0.3em}
+  {\small Four main entry points: View Map, Shortest Path,
+   Traveling Salesman, and HCMIU Collaborative.
+   Live system signals show API status, graph readiness,
+   and wayfinding availability.}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 9: Map View
+% --------------------------------------------------
+\begin{frame}{Interactive Campus Map}
+  \begin{center}
+    \includegraphics[width=0.72\textwidth]{map-view-page.png}
+  \end{center}
+  \vspace{-0.3em}
+  {\small 7-floor interactive map with zoom/pan, room search,
+   and direct links to collaborative discussions per location.}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 10: Pathfinding Algorithms
+% --------------------------------------------------
+\begin{frame}{Pathfinding Algorithms}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Shortest Path (BFS)}
+      \begin{itemize}
+        \item Breadth-first search on grid graph
+        \item Handles \textbf{inter-floor routing} via stairs and lifts
+        \item Visual path overlay on floor maps
+        \item Time complexity: $O(V + E)$
+      \end{itemize}
+      \vspace{0.5em}
+      \textbf{User Flow:}\\
+      Select start $\rightarrow$ Select end $\rightarrow$\\
+      View floor-by-floor directions
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Traveling Salesman (Held--Karp)}
+      \begin{itemize}
+        \item Bitmask dynamic programming
+        \item Optimal visit order for $n$ destinations
+        \item Multi-floor route planning
+        \item Time complexity: $O(2^n \cdot n^2)$
+      \end{itemize}
+      \vspace{0.5em}
+      \textbf{User Flow:}\\
+      Add locations $\rightarrow$ Solve $\rightarrow$\\
+      View optimised route with total distance
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 11: Collaborative Platform
+% --------------------------------------------------
+\begin{frame}{Collaborative Knowledge Graph}
+  \begin{center}
+    \includegraphics[width=0.68\textwidth]{collaborative-page.png}
+  \end{center}
+  \vspace{-0.3em}
+  {\small Entity-based discussions, cross-references, follow/notification
+   system, and real-time WebSocket updates.}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 12: Trial System
+% --------------------------------------------------
+\begin{frame}{Court of Justice --- Trial System}
+  \begin{center}
+    \begin{tikzpicture}[
+      state/.style={draw, rounded corners, minimum width=2.2cm,
+                    minimum height=0.8cm, align=center, font=\scriptsize},
+      arr/.style={->, thick, >=stealth, font=\scriptsize}
+    ]
+      \node[state, fill=red!15] (file) at (0,0) {Plaintiff\\Files Trial};
+      \node[state, fill=yellow!20] (prop) at (3.8,0) {Judge\\Proposal};
+      \node[state, fill=yellow!20] (nego) at (7.6,0) {Negotiation\\(back \& forth)};
+      \node[state, fill=blue!15] (agree) at (11.4,0) {Judges\\Agreed};
+      \node[state, fill=green!15] (vote) at (3.8,-1.8) {Judges\\Vote};
+      \node[state, fill=green!25] (resolve) at (7.6,-1.8) {Trial\\Resolved};
+
+      \draw[arr] (file) -- (prop);
+      \draw[arr] (prop) -- (nego);
+      \draw[arr] (nego) -- (agree);
+      \draw[arr] (agree) -- (vote);
+      \draw[arr] (vote) -- (resolve);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.3em}
+  \begin{itemize}
+    \item Plaintiff files trial against defendant over a disputed entity
+    \item Both parties negotiate judge selection (proposal $\leftrightarrow$ counter-proposal)
+    \item Agreed judges cast votes: \texttt{plaintiff} / \texttt{defendant} / \texttt{no\_winner}
+    \item Comments tagged by role: \texttt{[plaintiff]}, \texttt{[defendant]}, \texttt{[judge]}, \texttt{[spectator]}
+  \end{itemize}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 13: Research Tools
+% --------------------------------------------------
+\begin{frame}{Research \& Knowledge Graph Tools}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Reference Discovery}
+      \begin{itemize}
+        \item Query entities by ID
+        \item View all outbound references
+        \item Explore the citation network
+      \end{itemize}
+      \vspace{0.5em}
+      \textbf{Full-Text Search}
+      \begin{itemize}
+        \item Search across all entity titles and bodies
+        \item Keyword-based discovery
+        \item Cross-entity relationship finding
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Degree of Separation}
+      \begin{itemize}
+        \item Find shortest reference path between any two entities
+        \item Uses ArangoDB's native \texttt{SHORTEST\_PATH} function
+        \item Visualises intermediate hops
+      \end{itemize}
+      \vspace{0.5em}
+      \textbf{Mention Discovery}
+      \begin{itemize}
+        \item Find which entities mention a given entity
+        \item Reverse reference traversal
+        \item Map cross-entity relationships
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============================================================
+\section{Real-Time \& WebSocket}
+% ============================================================
+
+% --------------------------------------------------
+% SLIDE 14: Real-Time Architecture
+% --------------------------------------------------
+\begin{frame}{Real-Time Updates via WebSocket}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \textbf{Event Types:}
+      \begin{itemize}
+        \item \texttt{entity.created} --- new post or comment
+        \item \texttt{entity.updated} --- edit to existing entity
+        \item \texttt{entity.deleted} --- entity removed
+        \item \texttt{trial.created} --- new trial filed
+        \item \texttt{trial.updated} --- vote or status change
+        \item \texttt{notification.created} --- user alert
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{block}{Design Decisions}
+        \begin{itemize}
+          \item RFC 6455 WebSocket protocol
+          \item Token-authenticated connections
+          \item Server-push model (no polling)
+          \item All connected clients auto-refresh
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{0.5em}
+  \textbf{Result:} When User~A posts a comment, User~B sees it
+  instantly without page refresh---verified in multi-user E2E tests.
+\end{frame}
+
+% ============================================================
+\section{Technology \& Testing}
+% ============================================================
+
+% --------------------------------------------------
+% SLIDE 15: Technology Stack & Testing
+% --------------------------------------------------
+\begin{frame}{Technology Stack \& Testing}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Technology Stack:}
+      \begin{center}
+      \begin{tabular}{ll}
+        \toprule
+        \textbf{Layer} & \textbf{Technology} \\
+        \midrule
+        Frontend  & TypeScript, Vite, Tailwind \\
+        UI        & Hyperscript, Anime.js \\
+        Backend   & Node.js, Express 5 \\
+        Database  & ArangoDB 3.11 \\
+        Real-time & WebSocket (ws) \\
+        Auth      & libsodium (Argon2i) \\
+        Deploy    & Docker Compose \\
+        \bottomrule
+      \end{tabular}
+      \end{center}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Testing \& Validation:}
+      \begin{itemize}
+        \item \textbf{API unit tests} --- all REST endpoints
+        \item \textbf{E2E tests} --- full Docker Compose stack
+        \item \textbf{8 demo videos} --- Puppeteer-automated screen recordings covering:
+          \begin{itemize}
+            \item Map navigation
+            \item Multi-user real-time
+            \item Trial system workflow
+            \item Research tools (4 demos)
+            \item General platform overview
+          \end{itemize}
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============================================================
+\section{Conclusion}
+% ============================================================
+
+% --------------------------------------------------
+% SLIDE 16: Conclusions & Future Work
+% --------------------------------------------------
+\begin{frame}{Conclusions \& Future Work}
+  \textbf{Key Contributions:}
+  \begin{enumerate}
+    \item Demonstrated that a \textbf{multi-model DBMS} (ArangoDB) can effectively
+          serve both document storage and graph traversal needs in a single engine
+    \item Built a \textbf{complete campus platform} combining wayfinding,
+          collaboration, governance, and research
+    \item Implemented \textbf{graph-native features} (reference discovery,
+          degree-of-separation, mention traversal) that would be complex
+          in a document-only or relational system
+    \item Validated correctness through \textbf{comprehensive automated testing}
+  \end{enumerate}
+  \vspace{0.5em}
+  \textbf{Limitations \& Future Work:}
+  \begin{itemize}
+    \item Access control is creator-based; role-based permissions needed
+    \item Event ordering relies on eventual consistency; formal guarantees desirable
+    \item Map data is hardcoded; a map editor would improve extensibility
+    \item Performance benchmarking under concurrent load not yet conducted
+  \end{itemize}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 17: References
+% --------------------------------------------------
+\begin{frame}{References}
+  \begin{thebibliography}{9}
+    \bibitem{stonebraker2005onesize}
+    M.~Stonebraker and U.~\c{C}etintemel,
+    ``One Size Fits All: An Idea Whose Time Has Come and Gone,''
+    \emph{Proc.\ ICDE}, pp.~2--11, 2005.
+
+    \bibitem{sadalage2012nosql}
+    P.~Sadalage and M.~Fowler,
+    \emph{NoSQL Distilled: A Brief Guide to the Emerging World of
+    Polyglot Persistence},
+    Addison-Wesley, 2012.
+
+    \bibitem{arangodb_multimodel}
+    ArangoDB Inc.,
+    ``ArangoDB---the Multi-Model NoSQL Database,''
+    \url{https://www.arangodb.com/}, 2024.
+
+    \bibitem{zimmerman2006wayfinding}
+    A.~Zimmerman and M.~Martin,
+    ``Post-occupancy evaluation: benefits and barriers,''
+    \emph{Building Research \& Information},
+    vol.~29, no.~2, pp.~168--174, 2001.
+  \end{thebibliography}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 18: Thank You / Q&A
+% --------------------------------------------------
+\begin{frame}
+  \begin{center}
+    \vfill
+    {\Huge Thank You}\\[1em]
+    {\Large Questions?}\\[1.5em]
+    {\normalsize
+      \textbf{Live Demo:} \url{https://hcmiumap.huynhtrankhanh.com/}\\[0.3em]
+      \textbf{Source Code:} \url{https://github.com/huynhtrankhanh/hcmiu-map-collaborative}
+    }
+    \vfill
+  \end{center}
+\end{frame}
+
+\end{document}
