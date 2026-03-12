@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Backend stress throughput by scenario</title>
+  <desc id="desc">Requests per second achieved by each Docker Compose benchmark scenario.</desc>
+  <rect width="100%" height="100%" fill="#f8fafc" />
+  <text x="480" y="32" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Backend stress throughput</text>
+  <text x="480" y="52" text-anchor="middle" font-size="13" fill="#475569">Higher is better • requests per second against docker compose</text>
+  
+      <line x1="90" y1="310" x2="920" y2="310" stroke="#d1d5db" stroke-dasharray="4 4" />
+      <text x="78" y="315" font-size="12" text-anchor="end" fill="#475569">0.00</text>
+    
+      <line x1="90" y1="247.5" x2="920" y2="247.5" stroke="#d1d5db" stroke-dasharray="4 4" />
+      <text x="78" y="252.5" font-size="12" text-anchor="end" fill="#475569">812.71</text>
+    
+      <line x1="90" y1="185" x2="920" y2="185" stroke="#d1d5db" stroke-dasharray="4 4" />
+      <text x="78" y="190" font-size="12" text-anchor="end" fill="#475569">1,625.42</text>
+    
+      <line x1="90" y1="122.5" x2="920" y2="122.5" stroke="#d1d5db" stroke-dasharray="4 4" />
+      <text x="78" y="127.5" font-size="12" text-anchor="end" fill="#475569">2,438.12</text>
+    
+      <line x1="90" y1="60" x2="920" y2="60" stroke="#d1d5db" stroke-dasharray="4 4" />
+      <text x="78" y="65" font-size="12" text-anchor="end" fill="#475569">3,250.83</text>
+    
+  <line x1="90" y1="310" x2="920" y2="310" stroke="#475569" />
+  
+        <rect x="123.2" y="60" width="99.6" height="250" rx="8" fill="#2563eb" />
+        <text x="173" y="52" font-size="12" text-anchor="middle" fill="#0f172a">3,250.83</text>
+        <text x="173" y="334" font-size="12" text-anchor="end" transform="rotate(-28 173 334)" fill="#334155">Health check</text>
+      
+        <rect x="289.2" y="250.4208219704403" width="99.6" height="59.579178029559706" rx="8" fill="#0f766e" />
+        <text x="339" y="242.4208219704403" font-size="12" text-anchor="middle" fill="#0f172a">774.73</text>
+        <text x="339" y="334" font-size="12" text-anchor="end" transform="rotate(-28 339 334)" fill="#334155">Entity listing</text>
+      
+        <rect x="455.2" y="265.47005046366263" width="99.6" height="44.529949536337384" rx="8" fill="#9333ea" />
+        <text x="505" y="257.47005046366263" font-size="12" text-anchor="middle" fill="#0f172a">579.04</text>
+        <text x="505" y="334" font-size="12" text-anchor="end" transform="rotate(-28 505 334)" fill="#334155">Full-text search</text>
+      
+        <rect x="621.2" y="281.5725599163128" width="99.6" height="28.42744008368721" rx="8" fill="#ea580c" />
+        <text x="671" y="273.5725599163128" font-size="12" text-anchor="middle" fill="#0f172a">369.65</text>
+        <text x="671" y="334" font-size="12" text-anchor="end" transform="rotate(-28 671 334)" fill="#334155">Authenticated post creation</text>
+      
+        <rect x="787.2" y="263.1191086794811" width="99.6" height="46.88089132051889" rx="8" fill="#dc2626" />
+        <text x="837" y="255.1191086794811" font-size="12" text-anchor="middle" fill="#0f172a">609.61</text>
+        <text x="837" y="334" font-size="12" text-anchor="end" transform="rotate(-28 837 334)" fill="#334155">Notifications fetch</text>
+      
+  <text x="18" y="185" transform="rotate(-90 18 185)" font-size="13" fill="#334155">Requests / second</text>
+</svg>

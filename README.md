@@ -66,6 +66,20 @@ The Capacitor/Android build pipeline has been removed so the backend can serve t
 ```bash
 npm run test:api
 npm run test:e2e
+npm run test:stress-backend
 ```
 
 `npm run test:e2e` runs against the full Docker Compose deployment to validate production-like behavior.
+
+`npm run test:stress-backend` also runs against the Docker Compose deployment, then writes:
+
+- `docs/benchmarks/backend-stress-report.md`
+- `docs/benchmarks/backend-stress-throughput.svg`
+- `docs/benchmarks/backend-stress-latency.svg`
+- timestamped raw data under `artifacts/benchmarks/`
+
+To regenerate markdown + charts from an existing raw benchmark JSON file:
+
+```bash
+npm run benchmark:report -- --input ./artifacts/benchmarks/<run>.json
+```
