@@ -615,7 +615,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       case "notifications": {
         const notificationMarkup = notifications.length > 0
           ? notifications.map((n) => `
-            <div class="border rounded p-3 mb-2 bg-gray-50">
+            <div class="border rounded p-3 mb-2 bg-gray-50" style="border-left:4px solid ${n.read ? "#475569" : "#60a5fa"}">
               <div class="flex items-center gap-2 mb-1">
                 <span class="text-lg">${n.read ? "✅" : "🔔"}</span>
                 <span class="text-sm font-semibold flex-1">${escapeHtml(n.entityTitle || n.entityId)}</span>
