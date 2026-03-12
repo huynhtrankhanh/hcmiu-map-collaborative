@@ -76,9 +76,7 @@ body {
 .bg-green-700,
 .bg-gray-500,
 .bg-gray-600,
-.bg-slate-700,
-.bg-yellow-600,
-.bg-amber-600 {
+.bg-slate-700 {
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
   border: none;
   border-radius: 12px;
