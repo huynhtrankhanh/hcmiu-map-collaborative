@@ -221,6 +221,75 @@ const run = async () => {
     );
     const defendantNotifications = await fetchJson("/api/notifications", {}, defendant.token);
     if (!defendantNotifications.notifications.length) throw new Error("expected notifications for follower");
+    // Verify enhanced notification fields
+    const notif = defendantNotifications.notifications[0];
+    if (!notif.entityTitle) throw new Error("expected notification entityTitle");
+    if (!notif.commenterUsername) throw new Error("expected notification commenterUsername");
+    if (!notif.message.includes("Defendant comments") && !notif.commentBody) throw new Error("expected notification to contain comment content");
+
+    // Verify user follows endpoint
+    const defendantFollows = await fetchJson("/api/user/follows", {}, defendant.token);
+    if (!defendantFollows.entityIds.includes(createdEntityId)) throw new Error("expected followed entity in follows list");
+
+    // Verify unfollow removes from list
+    await fetchJson(`/api/entities/${createdEntityId}/unfollow`, { method: "POST" }, defendant.token);
+    const afterUnfollow = await fetchJson("/api/user/follows", {}, defendant.token);
+    if (afterUnfollow.entityIds.includes(createdEntityId)) throw new Error("expected entity removed from follows after unfollow");
+
+    // Re-follow for further tests
+    await fetchJson(`/api/entities/${createdEntityId}/follow`, { method: "POST" }, defendant.token);
+
+    // Test follow/unfollow UI - login as defendant in a separate page to test UI
+    const defPage = await browser.newPage();
+    defPage.on("dialog", async (dialog) => {
+      if (dialog.type() === "prompt") await dialog.accept("test");
+      else await dialog.accept();
+    });
+    await defPage.goto(frontendUrl, { waitUntil: "networkidle2" });
+    await clickButtonByText(defPage, "HCMIU Collaborative");
+    await defPage.waitForFunction(() => document.body.textContent?.includes("Entities"), { timeout: 30_000 });
+    await clickButtonByText(defPage, "🔐 Auth");
+    await defPage.waitForSelector("#username");
+    await defPage.type("#username", defendantUser);
+    await defPage.type("#password", password);
+    await defPage.click("#login");
+    await defPage.waitForFunction(() => document.body.textContent?.includes("Logged in as"), { timeout: 30_000 });
+
+    // Navigate to Entities and verify Follow/Unfollow state
+    await clickButtonByText(defPage, "📡 Entities");
+    await defPage.waitForFunction(() => document.body.textContent?.includes("E2E Core Entity"), { timeout: 30_000 });
+    // Since defendant is following, should see Unfollow button
+    const hasUnfollowButton = await defPage.evaluate((eid) => {
+      const btn = document.querySelector(`[data-unfollow="${eid}"]`);
+      return !!btn;
+    }, createdEntityId);
+    if (!hasUnfollowButton) throw new Error("expected Unfollow button for followed entity");
+    const hasFollowButton = await defPage.evaluate((eid) => {
+      const btn = document.querySelector(`[data-follow="${eid}"]`);
+      return !!btn;
+    }, createdEntityId);
+    if (hasFollowButton) throw new Error("expected no Follow button when already following");
+
+    // Click Unfollow and verify it changes to Follow
+    await defPage.evaluate((eid) => {
+      const btn = document.querySelector(`[data-unfollow="${eid}"]`);
+      if (btn) btn.click();
+    }, createdEntityId);
+    await defPage.waitForFunction((eid) => !!document.querySelector(`[data-follow="${eid}"]`), { timeout: 15_000 }, createdEntityId);
+    const hasFollowAfterUnfollow = await defPage.evaluate((eid) => !!document.querySelector(`[data-follow="${eid}"]`), createdEntityId);
+    if (!hasFollowAfterUnfollow) throw new Error("expected Follow button after unfollowing");
+
+    // Navigate to Notifications page and verify enhanced display
+    await clickButtonByText(defPage, "🔔 Notifications");
+    await defPage.waitForFunction(() => document.body.textContent?.includes("Notifications"), { timeout: 15_000 });
+    // Should see "View Entity" button for notification
+    const hasViewEntityBtn = await defPage.evaluate(() => !!document.querySelector('[data-notif-navigate]'));
+    if (!hasViewEntityBtn) throw new Error("expected View Entity button in notifications");
+    // Should see "Mark as Read" button
+    const hasMarkReadBtn = await defPage.evaluate(() => !!document.querySelector('[data-notif-read]'));
+    if (!hasMarkReadBtn) throw new Error("expected Mark as Read button in notifications");
+    await defPage.screenshot({ path: path.join(screenshotDir, "collaborative-notifications-enhanced.png"), fullPage: true });
+    await defPage.close();
 
     // Trial with interactive judge dialogue
     const trial = await fetchJson(

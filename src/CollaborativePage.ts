@@ -81,6 +81,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
   let trials: any[] = [];
   let notifications: any[] = [];
   let activityItems: any[] = [];
+  let followedEntityIds: Set<string> = new Set();
   let ws: WebSocket | null = null;
   type ResearchResult =
     | { type: "references" | "fulltext"; data: { entities: any[] } }
@@ -100,8 +101,12 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
     trials = trialsResult.trials;
     activityItems = activityResult.items;
     if (token) {
-      const notifResult = await jsonFetch("/api/notifications", {}, token);
+      const [notifResult, followsResult] = await Promise.all([
+        jsonFetch("/api/notifications", {}, token),
+        jsonFetch("/api/user/follows", {}, token),
+      ]);
       notifications = notifResult.notifications;
+      followedEntityIds = new Set(followsResult.entityIds);
     }
   };
 
@@ -434,7 +439,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
                 <div class="text-sm">${escapeHtml(entity.body || "")}</div>
                 <div class="text-xs text-gray-600">id: ${escapeHtml(entity.id)}</div>
                 <div class="text-xs text-gray-600">refs: ${(entity.references || []).map((r: string) => escapeHtml(r)).join(", ") || "none"}</div>
-                ${token ? `<div class="flex gap-2 flex-wrap mt-2"><button data-follow="${escapeHtml(entity.id)}" class="bg-blue-500 text-white px-2 py-1 rounded">Follow</button><button data-unfollow="${escapeHtml(entity.id)}" class="bg-gray-600 text-white px-2 py-1 rounded">Unfollow</button><button data-research-one="${escapeHtml(entity.id)}" class="bg-slate-700 text-white px-2 py-1 rounded">Find references</button>${mine ? `<button data-edit="${escapeHtml(entity.id)}" class="bg-yellow-600 text-white px-2 py-1 rounded">Edit</button><button data-delete="${escapeHtml(entity.id)}" class="bg-red-700 text-white px-2 py-1 rounded">Delete</button>` : ""}</div>` : ""}
+                ${token ? `<div class="flex gap-2 flex-wrap mt-2">${followedEntityIds.has(entity.id) ? `<button data-unfollow="${escapeHtml(entity.id)}" class="bg-gray-600 text-white px-2 py-1 rounded">Unfollow</button>` : `<button data-follow="${escapeHtml(entity.id)}" class="bg-blue-500 text-white px-2 py-1 rounded">Follow</button>`}<button data-research-one="${escapeHtml(entity.id)}" class="bg-slate-700 text-white px-2 py-1 rounded">Find references</button>${mine ? `<button data-edit="${escapeHtml(entity.id)}" class="bg-yellow-600 text-white px-2 py-1 rounded">Edit</button><button data-delete="${escapeHtml(entity.id)}" class="bg-red-700 text-white px-2 py-1 rounded">Delete</button>` : ""}</div>` : ""}
                 ${token ? `<div class="mt-2"><input data-comment-input="${escapeHtml(entity.id)}" class="border p-1 w-full" placeholder="Comment" /><button data-comment="${escapeHtml(entity.id)}" class="bg-green-600 text-white px-2 py-1 rounded mt-1">Comment</button></div>` : ""}
                 <ul class="text-sm list-disc pl-5 mt-2">${commentsMarkup}</ul>
               </div>
@@ -608,13 +613,30 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         break;
       }
       case "notifications": {
-        const notificationMarkup = notifications
-          .map((n) => `<li>${n.read ? "✅" : "🔔"} ${escapeHtml(n.message)} (${escapeHtml(n.entityId)})</li>`)
-          .join("");
+        const notificationMarkup = notifications.length > 0
+          ? notifications.map((n) => `
+            <div class="border rounded p-3 mb-2 ${n.read ? "bg-gray-50" : "bg-blue-50 border-blue-200"}">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-lg">${n.read ? "✅" : "🔔"}</span>
+                <span class="text-sm font-semibold flex-1">${escapeHtml(n.entityTitle || n.entityId)}</span>
+                <span class="text-xs text-gray-500">${n.createdAt ? escapeHtml(String(n.createdAt).replace("T", " ").slice(0, 19)) : ""}</span>
+              </div>
+              <div class="text-sm text-gray-800 mb-1">${escapeHtml(n.message)}</div>
+              ${n.commentBody ? `<div class="text-xs text-gray-600 italic border-l-2 border-gray-300 pl-2">${escapeHtml(n.commentBody)}</div>` : ""}
+              <div class="text-xs text-gray-500 mt-1">Entity: ${escapeHtml(n.entityId)}</div>
+              <div class="flex gap-2 mt-2">
+                <button data-notif-navigate="${escapeHtml(n.entityId)}" class="bg-blue-600 text-white px-2 py-1 rounded text-xs">View Entity</button>
+                ${!n.read ? `<button data-notif-read="${escapeHtml(n.id)}" class="bg-gray-500 text-white px-2 py-1 rounded text-xs">Mark as Read</button>` : ""}
+              </div>
+            </div>
+          `).join("")
+          : `<div class="text-sm text-gray-600">No notifications.</div>`;
         contentHtml = `
           <h2 class="text-xl font-semibold mb-3">🔔 Notifications</h2>
           ${token ? "" : `<p class="text-sm text-gray-600 mb-3">Log in to see your notifications.</p>`}
-          <ul class="list-disc pl-5 text-sm">${notificationMarkup || "<li>No notifications.</li>"}</ul>
+          <div style="max-height:60vh; overflow:auto; padding-right:0.5rem;">
+            ${notificationMarkup}
+          </div>
         `;
         break;
       }
@@ -814,7 +836,8 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       button.addEventListener("click", async () => {
         try {
           await jsonFetch(`/api/entities/${(button as HTMLElement).dataset.follow}/follow`, { method: "POST" }, token);
-          alert("Followed!");
+          await refresh();
+          render();
         } catch (error: any) {
           alert(error.message);
         }
@@ -824,7 +847,8 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       button.addEventListener("click", async () => {
         try {
           await jsonFetch(`/api/entities/${(button as HTMLElement).dataset.unfollow}/unfollow`, { method: "POST" }, token);
-          alert("Unfollowed!");
+          await refresh();
+          render();
         } catch (error: any) {
           alert(error.message);
         }
@@ -901,6 +925,39 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
             { method: "POST", body: JSON.stringify({ type: "comment", body: input.value, title: "", parentEntityId: entityId, references: [] }) },
             token
           );
+          await refresh();
+          render();
+        } catch (error: any) {
+          alert(error.message);
+        }
+      });
+    });
+
+    // Notification actions
+    panel.querySelectorAll("[data-notif-navigate]").forEach((button: Element) => {
+      button.addEventListener("click", () => {
+        const entityId = (button as HTMLElement).dataset.notifNavigate!;
+        currentSubPage = "entities";
+        render();
+        setTimeout(() => {
+          // Only one of follow/unfollow buttons exists per entity based on follow state
+          const entityEl = panel.querySelector(`[data-follow="${entityId}"], [data-unfollow="${entityId}"]`);
+          if (entityEl) {
+            const card = entityEl.closest(".border.rounded.p-3");
+            if (card) {
+              card.scrollIntoView({ behavior: "smooth", block: "center" });
+              (card as HTMLElement).style.outline = "3px solid #2563eb";
+              setTimeout(() => { (card as HTMLElement).style.outline = ""; }, 3000);
+            }
+          }
+        }, 100);
+      });
+    });
+    panel.querySelectorAll("[data-notif-read]").forEach((button: Element) => {
+      button.addEventListener("click", async () => {
+        const notifId = (button as HTMLElement).dataset.notifRead!;
+        try {
+          await jsonFetch(`/api/notifications/${notifId}/read`, { method: "POST" }, token);
           await refresh();
           render();
         } catch (error: any) {

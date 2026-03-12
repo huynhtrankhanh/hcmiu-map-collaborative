@@ -111,6 +111,19 @@ test("comprehensive collaborative flow", async () => {
     await fetchJsonOk(base, `/api/entities/${post.entity.id}/unfollow`, { method: "POST" }, defendant.token);
     await fetchJsonOk(base, `/api/entities/${post.entity.id}/follow`, { method: "POST" }, defendant.token);
 
+    // Verify user follows endpoint
+    const follows = await fetchJsonOk(base, "/api/user/follows", {}, defendant.token);
+    assert.ok(Array.isArray(follows.entityIds));
+    assert.ok(follows.entityIds.includes(post.entity.id));
+
+    // Unfollow and verify it's removed
+    await fetchJsonOk(base, `/api/entities/${post.entity.id}/unfollow`, { method: "POST" }, defendant.token);
+    const followsAfterUnfollow = await fetchJsonOk(base, "/api/user/follows", {}, defendant.token);
+    assert.ok(!followsAfterUnfollow.entityIds.includes(post.entity.id));
+
+    // Re-follow for notification testing
+    await fetchJsonOk(base, `/api/entities/${post.entity.id}/follow`, { method: "POST" }, defendant.token);
+
     const comment = await fetchJsonOk(base, "/api/entities", {
       method: "POST",
       body: JSON.stringify({ type: "comment", title: "", body: "I comment", parentEntityId: post.entity.id, references: [post.entity.id] }),
@@ -129,6 +142,18 @@ test("comprehensive collaborative flow", async () => {
 
     const notifications = await fetchJsonOk(base, "/api/notifications", {}, defendant.token);
     assert.equal(notifications.notifications.length, 1);
+    // Verify enhanced notification fields
+    const notif = notifications.notifications[0];
+    assert.ok(notif.entityTitle, "notification should include entityTitle");
+    assert.ok(notif.commenterUsername, "notification should include commenterUsername");
+    assert.ok(notif.message.includes("I comment") || notif.commentBody, "notification should include comment content");
+    assert.equal(notif.entityId, post.entity.id);
+    assert.equal(notif.read, false);
+
+    // Test mark notification as read
+    await fetchJsonOk(base, `/api/notifications/${notif.id}/read`, { method: "POST" }, defendant.token);
+    const notificationsAfterRead = await fetchJsonOk(base, "/api/notifications", {}, defendant.token);
+    assert.equal(notificationsAfterRead.notifications[0].read, true);
 
     // Trial creation
     const trial = await fetchJsonOk(base, "/api/trials", {
