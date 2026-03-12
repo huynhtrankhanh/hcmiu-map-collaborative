@@ -218,6 +218,14 @@ body .bg-yellow-200 * {
   color: var(--text);
 }
 
+.notification-card-read {
+  border-left: 4px solid #475569;
+}
+
+.notification-card-unread {
+  border-left: 4px solid #60a5fa;
+}
+
 .focus\:bg-white:focus {
   background: #000000;
 }
