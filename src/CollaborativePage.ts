@@ -549,9 +549,9 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         contentHtml = `
           <h2 class="text-xl font-semibold mb-3">🔎 Deep Research</h2>
           <div class="flex flex-wrap gap-2 mb-3">
-            <button data-research-tab="references" class="px-3 py-2 rounded border ${researchTab === "references" ? "bg-slate-700 text-white" : "bg-white"}">Referencing Entities</button>
-            <button data-research-tab="fulltext" class="px-3 py-2 rounded border ${researchTab === "fulltext" ? "bg-slate-700 text-white" : "bg-white"}">Full-text Search</button>
-            <button data-research-tab="degree" class="px-3 py-2 rounded border ${researchTab === "degree" ? "bg-slate-700 text-white" : "bg-white"}">Degree of Separation</button>
+            <button data-research-tab="references" class="px-3 py-2 rounded border ${researchTab === "references" ? "bg-slate-700 text-white" : "bg-gray-200 text-gray-800"}">Referencing Entities</button>
+            <button data-research-tab="fulltext" class="px-3 py-2 rounded border ${researchTab === "fulltext" ? "bg-slate-700 text-white" : "bg-gray-200 text-gray-800"}">Full-text Search</button>
+            <button data-research-tab="degree" class="px-3 py-2 rounded border ${researchTab === "degree" ? "bg-slate-700 text-white" : "bg-gray-200 text-gray-800"}">Degree of Separation</button>
           </div>
           <section class="border rounded p-3 mb-3" style="${researchTab === "references" ? "" : "display:none"}">
             <h3 class="font-semibold mb-2">Find Referencing Entities</h3>
