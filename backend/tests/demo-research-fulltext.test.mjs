@@ -146,7 +146,7 @@ const run = async () => {
     /* ============================================================== */
     console.log("  Scene 3: Search for 'solar'");
     await showOverlay(page, '🔎 Searching for "solar"', "#7c3aed");
-    await slowType(page, "#fulltext-input", "solar", 60);
+    await slowType(page, "#research-fulltext", "solar", 60);
     await pause(500);
     await clickSearchButton(page);
     await pause(2500);
@@ -157,9 +157,9 @@ const run = async () => {
     /*  SCENE 4 – Search for "library"                                */
     /* ============================================================== */
     console.log("  Scene 4: Search for 'library'");
-    await clearInput(page, "#fulltext-input");
+    await clearInput(page, "#research-fulltext");
     await showOverlay(page, '🔎 Searching for "library"', "#7c3aed");
-    await slowType(page, "#fulltext-input", "library", 60);
+    await slowType(page, "#research-fulltext", "library", 60);
     await pause(500);
     await clickSearchButton(page);
     await pause(2500);
@@ -170,9 +170,9 @@ const run = async () => {
     /*  SCENE 5 – Search for "recycling"                              */
     /* ============================================================== */
     console.log("  Scene 5: Search for 'recycling'");
-    await clearInput(page, "#fulltext-input");
+    await clearInput(page, "#research-fulltext");
     await showOverlay(page, '🔎 Searching for "recycling"', "#7c3aed");
-    await slowType(page, "#fulltext-input", "recycling", 60);
+    await slowType(page, "#research-fulltext", "recycling", 60);
     await pause(500);
     await clickSearchButton(page);
     await pause(2500);
@@ -183,9 +183,9 @@ const run = async () => {
     /*  SCENE 6 – Empty results for unknown term                      */
     /* ============================================================== */
     console.log("  Scene 6: Empty search");
-    await clearInput(page, "#fulltext-input");
+    await clearInput(page, "#research-fulltext");
     await showOverlay(page, '🔎 Searching for "quantum" (no matches expected)', "#7c3aed");
-    await slowType(page, "#fulltext-input", "quantum", 60);
+    await slowType(page, "#research-fulltext", "quantum", 60);
     await pause(500);
     await clickSearchButton(page);
     await pause(2500);
@@ -196,9 +196,9 @@ const run = async () => {
     /*  SCENE 7 – One more search to wrap up                          */
     /* ============================================================== */
     console.log("  Scene 7: Search for 'campus'");
-    await clearInput(page, "#fulltext-input");
+    await clearInput(page, "#research-fulltext");
     await showOverlay(page, '🔎 Searching for "campus" — broad term', "#7c3aed");
-    await slowType(page, "#fulltext-input", "campus", 60);
+    await slowType(page, "#research-fulltext", "campus", 60);
     await pause(500);
     await clickSearchButton(page);
     await pause(2500);
@@ -250,9 +250,11 @@ async function researchTabSwitch(page, tabName) {
 async function clickSearchButton(page) {
   try {
     await page.evaluate(() => {
-      const btn = Array.from(document.querySelectorAll("button")).find(
-        (b) => (b.textContent || "").toLowerCase().includes("search")
-      );
+      const btn =
+        document.querySelector("#research-fulltext-btn") ||
+        Array.from(document.querySelectorAll("button")).find(
+          (b) => (b.textContent || "").toLowerCase().includes("search")
+        );
       if (btn) btn.click();
     });
   } catch { /* button may not exist yet; the demo continues gracefully */ }
