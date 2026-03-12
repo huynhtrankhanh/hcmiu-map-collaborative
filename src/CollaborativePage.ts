@@ -549,9 +549,9 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
         contentHtml = `
           <h2 class="text-xl font-semibold mb-3">🔎 Deep Research</h2>
           <div class="flex flex-wrap gap-2 mb-3">
-            <button data-research-tab="references" class="px-3 py-2 rounded border ${researchTab === "references" ? "bg-slate-700 text-white" : "bg-white"}">Referencing Entities</button>
-            <button data-research-tab="fulltext" class="px-3 py-2 rounded border ${researchTab === "fulltext" ? "bg-slate-700 text-white" : "bg-white"}">Full-text Search</button>
-            <button data-research-tab="degree" class="px-3 py-2 rounded border ${researchTab === "degree" ? "bg-slate-700 text-white" : "bg-white"}">Degree of Separation</button>
+            <button data-research-tab="references" class="px-3 py-2 rounded border ${researchTab === "references" ? "bg-slate-700 text-white" : "bg-gray-200 text-gray-800"}">Referencing Entities</button>
+            <button data-research-tab="fulltext" class="px-3 py-2 rounded border ${researchTab === "fulltext" ? "bg-slate-700 text-white" : "bg-gray-200 text-gray-800"}">Full-text Search</button>
+            <button data-research-tab="degree" class="px-3 py-2 rounded border ${researchTab === "degree" ? "bg-slate-700 text-white" : "bg-gray-200 text-gray-800"}">Degree of Separation</button>
           </div>
           <section class="border rounded p-3 mb-3" style="${researchTab === "references" ? "" : "display:none"}">
             <h3 class="font-semibold mb-2">Find Referencing Entities</h3>
@@ -615,7 +615,7 @@ export const CollaborativePage = (onExit?: () => void, options?: CollaborativePa
       case "notifications": {
         const notificationMarkup = notifications.length > 0
           ? notifications.map((n) => `
-            <div class="border rounded p-3 mb-2 ${n.read ? "bg-red-50" : "bg-blue-50 border-blue-200"}">
+            <div class="border rounded p-3 mb-2 bg-gray-50 ${n.read ? "notification-card-read" : "notification-card-unread"}" role="group" aria-label="${n.read ? "Read notification" : "Unread notification"}">
               <div class="flex items-center gap-2 mb-1">
                 <span class="text-lg">${n.read ? "✅" : "🔔"}</span>
                 <span class="text-sm font-semibold flex-1">${escapeHtml(n.entityTitle || n.entityId)}</span>

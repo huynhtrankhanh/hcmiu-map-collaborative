@@ -13,6 +13,8 @@
   --glow: rgba(34, 211, 238, 0.15);
   --accent: #22d3ee;
   --accent-2: #fbbf24;
+  --notification-read-border: #475569;
+  --notification-unread-border: #60a5fa;
   --text: #e2e8f0;
   --muted: #94a3b8;
 }
@@ -216,6 +218,14 @@ body .bg-yellow-200 * {
 .hover\:bg-blue-50:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
+}
+
+.notification-card-read {
+  border-left: 4px solid var(--notification-read-border);
+}
+
+.notification-card-unread {
+  border-left: 4px solid var(--notification-unread-border);
 }
 
 .focus\:bg-white:focus {
