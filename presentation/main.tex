@@ -618,11 +618,7 @@ and changes appear instantly on both screens.
       \begin{itemize}
         \item \textbf{API unit tests} --- all REST endpoints
         \item \textbf{E2E tests} --- full Docker Compose stack
-        \item \textbf{Backend stress benchmark} (25{,}461 requests, 0 failures)
-          \begin{itemize}
-            \item Health check: 3{,}250.83 req/s, p95 11.82 ms
-            \item Full-text search: 579.04 req/s, p95 20.97 ms
-          \end{itemize}
+        \item \textbf{Backend stress benchmark visualisations} --- throughput and latency charts
         \item \textbf{8 demo videos} --- Puppeteer-automated screen recordings covering:
           \begin{itemize}
             \item Map navigation
@@ -647,9 +643,38 @@ and eight automated demo videos generated with Puppeteer
 that exercise every major workflow.
 These demos serve as both regression tests and documentation---they
 show exactly how each feature works through real browser interactions.
-We also ran a backend stress benchmark and recorded 25,461 requests
-with zero failures, with p95 latency under 21 milliseconds on the
-tested read-heavy scenarios.
+We also visualise backend stress benchmark performance on the next
+two slides using throughput and latency percentile charts.
+}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 16: Benchmark Throughput
+% --------------------------------------------------
+\begin{frame}{Benchmarking: Throughput by Scenario}
+  \begin{center}
+    \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{../docs/benchmarks/backend-stress-throughput.png}
+  \end{center}
+\note{
+This chart summarizes throughput across benchmark scenarios.
+It highlights that simple endpoints like health checks achieve the highest
+request rates, while heavier features such as full-text and mention queries
+remain stable at lower but consistent throughput.
+}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 17: Benchmark Latency
+% --------------------------------------------------
+\begin{frame}{Benchmarking: Latency Percentiles by Scenario}
+  \begin{center}
+    \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{../docs/benchmarks/backend-stress-latency.png}
+  \end{center}
+\note{
+This latency chart compares p50, p95, and p99 by scenario.
+Most scenarios stay in a low-latency band, and the percentile spread helps
+us reason about tail behavior under load rather than relying on single
+headline numbers.
 }
 \end{frame}
 
@@ -658,7 +683,7 @@ tested read-heavy scenarios.
 % ============================================================
 
 % --------------------------------------------------
-% SLIDE 16: Conclusions & Future Work
+% SLIDE 18: Conclusions & Future Work
 % --------------------------------------------------
 \begin{frame}{Conclusions \& Future Work}
   \textbf{Key Contributions:}
@@ -698,7 +723,7 @@ and broader benchmarking under sustained mixed workloads.
 \end{frame}
 
 % --------------------------------------------------
-% SLIDE 17: References
+% SLIDE 19: References
 % --------------------------------------------------
 \begin{frame}{References}
   \begin{thebibliography}{9}
@@ -737,7 +762,7 @@ Thank you for your attention. I am happy to take questions.
 \end{frame}
 
 % --------------------------------------------------
-% SLIDE 18: Thank You / Q&A
+% SLIDE 20: Thank You / Q&A
 % --------------------------------------------------
 \begin{frame}
   \begin{center}

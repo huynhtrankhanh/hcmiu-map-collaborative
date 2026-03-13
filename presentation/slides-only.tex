@@ -439,11 +439,7 @@ FOR e IN entities
       \begin{itemize}
         \item \textbf{API unit tests} --- all REST endpoints
         \item \textbf{E2E tests} --- full Docker Compose stack
-        \item \textbf{Backend stress benchmark} (25{,}461 requests, 0 failures)
-          \begin{itemize}
-            \item Health check: 3{,}250.83 req/s, p95 11.82 ms
-            \item Full-text search: 579.04 req/s, p95 20.97 ms
-          \end{itemize}
+        \item \textbf{Backend stress benchmark visualisations} --- throughput and latency charts
         \item \textbf{8 demo videos} --- Puppeteer-automated screen recordings covering:
           \begin{itemize}
             \item Map navigation
@@ -457,12 +453,30 @@ FOR e IN entities
   \end{columns}
 \end{frame}
 
+% --------------------------------------------------
+% SLIDE 16: Benchmark Throughput
+% --------------------------------------------------
+\begin{frame}{Benchmarking: Throughput by Scenario}
+  \begin{center}
+    \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{../docs/benchmarks/backend-stress-throughput.png}
+  \end{center}
+\end{frame}
+
+% --------------------------------------------------
+% SLIDE 17: Benchmark Latency
+% --------------------------------------------------
+\begin{frame}{Benchmarking: Latency Percentiles by Scenario}
+  \begin{center}
+    \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{../docs/benchmarks/backend-stress-latency.png}
+  \end{center}
+\end{frame}
+
 % ============================================================
 \section{Conclusion}
 % ============================================================
 
 % --------------------------------------------------
-% SLIDE 16: Conclusions & Future Work
+% SLIDE 18: Conclusions & Future Work
 % --------------------------------------------------
 \begin{frame}{Conclusions \& Future Work}
   \textbf{Key Contributions:}
@@ -487,7 +501,7 @@ FOR e IN entities
 \end{frame}
 
 % --------------------------------------------------
-% SLIDE 17: References
+% SLIDE 19: References
 % --------------------------------------------------
 \begin{frame}{References}
   \begin{thebibliography}{9}
@@ -516,7 +530,7 @@ FOR e IN entities
 \end{frame}
 
 % --------------------------------------------------
-% SLIDE 18: Thank You / Q&A
+% SLIDE 20: Thank You / Q&A
 % --------------------------------------------------
 \begin{frame}
   \begin{center}
