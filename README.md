@@ -1,5 +1,7 @@
 # hcmiu-map Collaborative
 
+GitHub: https://github.com/huynhtrankhanh/hcmiu-map-collaborative
+
 An interactive, community-powered map of the Ho Chi Minh City International University campus. It combines classic pathfinding features with a collaborative layer so students, staff, and visitors can share knowledge about every room, facility, and service on campus.
 
 ## Purpose and core scenarios
