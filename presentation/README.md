@@ -6,9 +6,9 @@ This directory contains the LaTeX Beamer presentation for the HCMIU Map Collabor
 
 | File | Description |
 |------|-------------|
-| `main.tex` | Full presentation with **presenter notes** (36 pages: 18 slides + 18 note pages) |
+| `main.tex` | Full presentation with **presenter notes** (40 pages: 20 slides + 20 note pages) |
 | `main.pdf` | Compiled PDF of `main.tex` |
-| `slides-only.tex` | Slides-only version **without** presenter notes (18 pages) |
+| `slides-only.tex` | Slides-only version **without** presenter notes (20 pages) |
 | `slides-only.pdf` | Compiled PDF of `slides-only.tex` |
 
 ## Duration
@@ -50,6 +50,8 @@ Requires: `texlive-latex-base`, `texlive-latex-recommended`, `texlive-latex-extr
 13. **Research Tools** — Reference, full-text, degree, mention
 14. **WebSocket** — Real-time event types and design
 15. **Tech Stack & Testing** — Technology table + test coverage
-16. **Conclusions** — Key contributions and future work
-17. **References** — Academic citations
-18. **Thank You / Q&A** — Links to live demo and source code
+16. **Benchmark Throughput** — Stress-test throughput chart
+17. **Benchmark Latency** — Stress-test latency percentile chart
+18. **Conclusions** — Key contributions and future work
+19. **References** — Academic citations
+20. **Thank You / Q&A** — Links to live demo and source code
