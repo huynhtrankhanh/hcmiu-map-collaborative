@@ -439,6 +439,11 @@ FOR e IN entities
       \begin{itemize}
         \item \textbf{API unit tests} --- all REST endpoints
         \item \textbf{E2E tests} --- full Docker Compose stack
+        \item \textbf{Backend stress benchmark} (25{,}461 requests, 0 failures)
+          \begin{itemize}
+            \item Health check: 3{,}250.83 req/s, p95 11.82 ms
+            \item Full-text search: 579.04 req/s, p95 20.97 ms
+          \end{itemize}
         \item \textbf{8 demo videos} --- Puppeteer-automated screen recordings covering:
           \begin{itemize}
             \item Map navigation
@@ -477,7 +482,7 @@ FOR e IN entities
     \item Access control is creator-based; role-based permissions needed
     \item Event ordering relies on eventual consistency; formal guarantees desirable
     \item Map data is hardcoded; a map editor would improve extensibility
-    \item Performance benchmarking under concurrent load not yet conducted
+    \item Extend benchmarking to sustained mixed-write workloads and larger datasets
   \end{itemize}
 \end{frame}
 
