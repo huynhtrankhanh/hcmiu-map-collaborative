@@ -2,8 +2,6 @@
 
 An interactive, community-powered map of the Ho Chi Minh City International University campus. It combines classic pathfinding features with a collaborative layer so students, staff, and visitors can share knowledge about every room, facility, and service on campus.
 
-demo: **https://hcmiumap.huynhtrankhanh.com/**
-
 ## Purpose and core scenarios
 
 - Help newcomers and visitors orient quickly, plan routes between classes, and chain multiple errands efficiently.
